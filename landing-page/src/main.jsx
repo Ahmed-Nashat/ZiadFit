@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { fallback } from "./content";
 import "./style.css";
@@ -76,6 +76,7 @@ function FAQItem({ item }) {
 function App() {
   const [data, setData] = useState(fallback),
     [selected, setSelected] = useState(0);
+  const revealed = useRef(new WeakSet());
   useEffect(() => {
     // Only a complete, explicitly published payload is eligible to replace the local fallback.
     fetch("/api/public/site")
@@ -93,6 +94,34 @@ function App() {
       })
       .catch(() => {});
   }, []);
+  useEffect(() => {
+    if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(({ target, isIntersecting }) => {
+        if (!isIntersecting) return;
+        observer.unobserve(target);
+        if (revealed.current.has(target)) return;
+        revealed.current.add(target);
+        if (typeof target.animate === "function") {
+          target.animate(
+            [{ opacity: 0 }, { opacity: 1 }],
+            { duration: 450, easing: "ease-out" },
+          );
+        }
+      });
+    }, { rootMargin: "0px 0px 100px 0px", threshold: 0 });
+
+    document.querySelectorAll(".section-head, .step, .result-card, .certificate, .pricing-layout > div, .faq-section > div, .footer-inner").forEach((element) => {
+      if (revealed.current.has(element)) return;
+      if (element.getBoundingClientRect().top < window.innerHeight) {
+        revealed.current.add(element);
+      } else {
+        observer.observe(element);
+      }
+    });
+    return () => observer.disconnect();
+  }, [data]);
   const plan = data.plans[selected] || data.plans[0];
   const register = plan?.id
     ? `/register?planId=${encodeURIComponent(plan.id)}`
