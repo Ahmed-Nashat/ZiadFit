@@ -1,5 +1,6 @@
 import mongoose, { HydratedDocument } from "mongoose";
-import { enums, IUser } from "../../common/index.js";
+import * as enums from "../../common/enums/index.js";
+import type { IUser } from "../../common/interface/user.interface.js";
 
 const userSchema = new mongoose.Schema<IUser>(
   {

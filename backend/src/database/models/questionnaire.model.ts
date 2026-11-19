@@ -1,10 +1,11 @@
-import mongoose, { Types } from "mongoose";
-import { enums, IQuestionnaire } from "../../common/index.js";
+import mongoose from "mongoose";
+import * as enums from "../../common/enums/index.js";
+import type { IQuestionnaire } from "../../common/interface/questionnaire.interface.js";
 
 const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
   {
     clientId: {
-      type: Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       required: true,
       ref: "user",
     },
@@ -26,6 +27,10 @@ const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
       type: String,
       trim: true,
     },
+    revision: {
+      type: Number,
+      default: 0,
+    },
     answers: {
       primaryGoal: {
         type: String,
@@ -43,7 +48,6 @@ const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
         type: Number,
         min: 0,
         max: 7,
-        trim: true,
       },
       trainingExp: {
         type: String,
@@ -78,6 +82,17 @@ const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
     strictQuery: true,
     timestamps: true,
     strict: true,
+  },
+);
+
+//So a client can have one draft and still have older pending or reviewed questionnaires
+questionnaireSchema.index(
+  { clientId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: enums.questionnaireStatusEnum.draft,
+    },
   },
 );
 

@@ -1,7 +1,7 @@
 import type { ProjectionType, QueryFilter, QueryOptions } from "mongoose";
-import { userModel } from "../../database/index.js";
-import type { IUser } from "../index.js";
-import { BaseRepo } from "./index.js";
+import { userModel } from "../../database/models/user.model.js";
+import type { IUser } from "../interface/user.interface.js";
+import BaseRepo from "./base.repo.js";
 
 export class UserRepo extends BaseRepo<IUser> {
   constructor() {

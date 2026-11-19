@@ -1,5 +1,6 @@
 import { isValidObjectId, Model, Types } from "mongoose";
-// import { exceptions, type IPgginate } from "../index.js";
+import { exceptions } from "../exceptions/index.js";
+import type { IPgginate } from "../interface/paggination.interface.js";
 import type {
   ApplyBasicCreateCasting,
   DeepPartial,
@@ -13,10 +14,8 @@ import type {
   Require_id,
   UpdateQuery,
   UpdateWriteOpResult,
-  MongooseBaseQueryOptions,
   CreateOptions,
 } from "mongoose";
-import type { Abortable, CountOptions, DeleteOptions } from "mongodb";
 
 type createObject<TRawDocType> = DeepPartial<
   ApplyBasicCreateCasting<Require_id<TRawDocType>>
@@ -24,7 +23,6 @@ type createObject<TRawDocType> = DeepPartial<
 
 export default class BaseRepo<TRawDocType> {
   constructor(protected model: Model<TRawDocType>) {
-    this.model = model;
   }
 
   // -------------------- CREATE ---------------------
@@ -44,7 +42,7 @@ export default class BaseRepo<TRawDocType> {
   }: {
     // parameters data types
     data: createObject<TRawDocType>[];
-    options?: CreateOptions;
+    options?: CreateOptions & { aggregateErrors?: false };
   }): Promise<HydratedDocument<TRawDocType>[]>;
 
   // main function
@@ -54,13 +52,12 @@ export default class BaseRepo<TRawDocType> {
   }: {
     // parameters data types
     data: createObject<TRawDocType> | createObject<TRawDocType>[];
-    options?: CreateOptions;
+    options?: CreateOptions & { aggregateErrors?: false };
   }): Promise<HydratedDocument<TRawDocType> | HydratedDocument<TRawDocType>[]> {
-    try {
-      return await this.model.create(data as any, options);
-    } catch (e) {
-      throw new exceptions.BadRequestException("Something went wrong");
+    if (Array.isArray(data)) {
+      return this.model.create(data as createObject<TRawDocType>[], options);
     }
+    return this.model.create(data);
   }
 
   // -------------------- FINDERS --------------------
@@ -111,11 +108,9 @@ export default class BaseRepo<TRawDocType> {
     options,
   }: {
     filter: QueryFilter<TRawDocType>;
-    options?:
-      | (CountOptions & MongooseBaseQueryOptions<TRawDocType> & Abortable)
-      | null;
+    options?: Parameters<Model<TRawDocType>["countDocuments"]>[1];
   }): Promise<number> {
-    // return this.model.countDocuments(filter, options);
+    return this.model.countDocuments(filter, options);
   }
 
   async findOne({
@@ -129,6 +124,29 @@ export default class BaseRepo<TRawDocType> {
     // FlattenMaps works as lean
   }): Promise<HydratedDocument<TRawDocType> | FlattenMaps<TRawDocType> | null> {
     const query = this.model.findOne(filter, projection, options);
+    if (options?.populate) {
+      query?.populate(options.populate as PopulateOptions[]);
+    }
+    if (options?.lean) {
+      // to remove the virtuals fields
+      query?.lean(options.lean);
+    }
+    return query.exec();
+  }
+
+  async find({
+    filter = {},
+    projection,
+    options = {},
+  }: {
+    filter: QueryFilter<TRawDocType>;
+    projection?: ProjectionType<TRawDocType>;
+    options?: QueryOptions<TRawDocType>;
+    // FlattenMaps works as lean
+  }): Promise<
+    (HydratedDocument<TRawDocType> | FlattenMaps<TRawDocType>)[]
+  > {
+    const query = this.model.find(filter, projection, options);
     if (options?.populate) {
       query?.populate(options.populate as PopulateOptions[]);
     }
@@ -160,9 +178,9 @@ export default class BaseRepo<TRawDocType> {
   }: {
     filter: QueryFilter<TRawDocType>;
     update: UpdateQuery<TRawDocType>;
-    options?: QueryOptions<TRawDocType>;
+    options?: Parameters<Model<TRawDocType>["updateOne"]>[2];
   }): Promise<UpdateWriteOpResult> {
-    return await this.model.updateOne(filter, update);
+    return await this.model.updateOne(filter, update, options);
   }
 
   async updateMany({
@@ -172,9 +190,9 @@ export default class BaseRepo<TRawDocType> {
   }: {
     filter: QueryFilter<TRawDocType>;
     update: UpdateQuery<TRawDocType>;
-    options?: QueryOptions<TRawDocType>;
+    options?: Parameters<Model<TRawDocType>["updateMany"]>[2];
   }): Promise<UpdateWriteOpResult> {
-    return await this.model.updateMany(filter, update);
+    return await this.model.updateMany(filter, update, options);
   }
 
   async findByIdAndUpdate({
@@ -226,9 +244,9 @@ export default class BaseRepo<TRawDocType> {
     options = {},
   }: {
     filter: QueryFilter<TRawDocType>;
-    options?: DeleteOptions & MongooseBaseQueryOptions<TRawDocType>;
+    options?: Parameters<Model<TRawDocType>["deleteOne"]>[1];
   }): Promise<DeleteResult> {
-    // return await this.model.deleteOne(filter, options);
+    return await this.model.deleteOne(filter, options);
   }
 
   async deleteMany({
@@ -236,9 +254,9 @@ export default class BaseRepo<TRawDocType> {
     options = {},
   }: {
     filter: QueryFilter<TRawDocType>;
-    options?: DeleteOptions & MongooseBaseQueryOptions<TRawDocType>;
+    options?: Parameters<Model<TRawDocType>["deleteMany"]>[1];
   }): Promise<DeleteResult> {
-    // return await this.model.deleteMany(filter, options);
+    return await this.model.deleteMany(filter, options);
   }
 
   async findOneAndDelete({

@@ -1,8 +1,8 @@
-import mongoose, { Types } from "mongoose";
+import { Types } from "mongoose";
 import type { questionnaireStatusEnum } from "../enums/index.js";
 
 export interface IQuestionnaire {
-  clientId: mongoose.Schema.Types.ObjectId;
+  clientId: Types.ObjectId;
   formVersion: number;
   status: questionnaireStatusEnum;
   submittedAt?: Date;
@@ -11,6 +11,7 @@ export interface IQuestionnaire {
   reviewNotes?: string;
   createdAt: Date;
   updatedAt: Date;
+  revision: number;
   // to allow saving drafts
   answers: Partial<IQuestionnaireAnswers>;
 }
@@ -21,9 +22,9 @@ export interface IQuestionnaireAnswers {
   weightKg: number;
   trainingExp: string;
   trainingDaysPerWeek: number;
-  sessionDurationMinutes?: number;
-  availableEquipment?: string;
-  injuriesOrRestrictions?: string;
-  sleepHours?: number;
-  preferredPlan?: string;
+  sessionDurationMinutes: number;
+  availableEquipment: string;
+  injuriesOrRestrictions: string;
+  sleepHours: number;
+  preferredPlan: string;
 }
