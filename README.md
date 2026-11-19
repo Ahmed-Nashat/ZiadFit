@@ -13,9 +13,9 @@ A full-stack fitness coaching platform for managing personalized workout plans, 
 
 ## Tech Stack
 
-| Frontend | Backend | Database | Hosting |
-|---|---|---|---|
-| React + Tailwind CSS | Node.js + Express | MongoDB Atlas | Cloudflare |
+| Frontend | Backend | Database | Caching | Hosting |
+|---|---|---|---|---|
+| React + Tailwind CSS | Node.js + Express | MongoDB Atlas | Redis | Cloudflare |
 
 ## System Architecture
 
