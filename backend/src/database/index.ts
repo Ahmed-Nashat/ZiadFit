@@ -1,1 +1,1 @@
-export { type HUser, userModel } from "./models/index.js";
+export { type HUser, userModel, questionnaireModel } from "./models/index.js";
