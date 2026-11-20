@@ -78,6 +78,12 @@ export const signupSchema = () =>
     body: signBody(),
   });
 
+export const confirmEmailSchema = () => z.object({
+  body: z.object({
+    otp: z.string().regex(/^\d{6}$/, "OTP must contain six digits"),
+  }),
+});
+
 export const refreshTokenSchema = () =>
   z.object({
     headers: generalFields.headers().passthrough(),

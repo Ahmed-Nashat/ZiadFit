@@ -1,21 +1,22 @@
 import jwt from "jsonwebtoken";
-import { max_retries, refresh_ex } from "../../config/config.service.js";
+import { max_retries, max_send_retries, refresh_ex } from "../../config/config.service.js";
 import crypto from "crypto";
+import { sendEmail } from "../../common/services/mail.service.js";
+import { signupOtpTemplate, forgetPasswordOtpTemplate, twoFactorOtpTemplate } from "../../common/templates/templates.js";
 import type { HydratedDocument, Types } from "mongoose";
-import {
-  repos,
-  exceptions,
-  services,
-  type IUser,
-  enums,
-  eventEmitter,
-  type ICreateToken,
-} from "../../common/index.js";
+import * as enums from "../../common/enums/index.js";
+import { exceptions } from "../../common/exceptions/index.js";
+import { userRepo } from "../../common/repo/user.repo.js";
+import { cacheService } from "../../common/services/cache.service.js";
+import { tokenService } from "../../common/services/token.service.js";
+import { eventEmitter } from "../../common/events/email.events.js";
+import type { IUser } from "../../common/interface/user.interface.js";
+import type { ICreateToken } from "../../common/interface/token.interface.js";
 
 // ---------------------- FUNCTIONS TYPES --------------------
 type CreateAndSendOtpType = {
   user: HydratedDocument<IUser>;
-  event: string;
+  event: enums.eventEnum;
 };
 
 type BlockUserType = {
@@ -36,12 +37,9 @@ type CheckUserType = {
 // -----------------------------------------------------------
 
 export class AuthHelpers {
-  private readonly userRepo: repos.UserRepo;
-  private readonly tokenService: services.TokenService;
-  constructor() {
-    this.userRepo = repos.userRepo;
-    this.tokenService = services.tokenService;
-  }
+  private readonly userRepo = userRepo;
+  private readonly cacheService = cacheService;
+  private get tokenService() { return tokenService; }
 
   generateOtp = (): number => crypto.randomInt(100000, 1000000);
 
@@ -68,14 +66,14 @@ export class AuthHelpers {
     const key = this.getUserLoginTriesKey(userId);
     let tries = 1;
 
-    if (await services.cacheService.exists({ key })) {
-      tries = await services.cacheService.incr({ key });
+    if (await this.cacheService.exists({ key })) {
+      tries = await this.cacheService.incr({ key });
     } else {
-      await services.cacheService.set({ key, value: 1, ttl: 15 * 60 });
+      await this.cacheService.set({ key, value: 1, ttl: 15 * 60 });
     }
 
     if (tries >= max_retries) {
-      await services.cacheService.del({ key: [key] });
+      await this.cacheService.del({ key: [key] });
       await this.userRepo.updateOne({
         filter: {
           _id: userId,
@@ -95,23 +93,33 @@ export class AuthHelpers {
 
   // ---------------------- CREATE & SEND OTP ------------------
   async createAndSendOtp({ user, event }: CreateAndSendOtpType): Promise<void> {
-    const otp = this.generateOtp();
-    const key =
-      event === enums.eventEnum.forget
-        ? this.getUserOTPForgetKey(user?.id)
-        : this.getUserOTPKey(user?.id);
+    const templates = {
+      [enums.eventEnum.signup]: signupOtpTemplate,
+      [enums.eventEnum.forget]: forgetPasswordOtpTemplate,
+      [enums.eventEnum.fa]: twoFactorOtpTemplate,
+    };
+    if (!(event in templates)) throw new exceptions.BadRequestException("Invalid OTP purpose");
+    if (!Number.isInteger(max_send_retries) || max_send_retries < 1) throw new exceptions.ServerException("OTP send limit is not configured");
+    const otp = String(this.generateOtp());
+    const key = this.getOtpKey(user.id, event);
+    const reservation = await this.cacheService.reserveOtp(key, this.getUserSendKey(user.id), otp, max_send_retries);
+    if (reservation < 0) throw new exceptions.TooManyRequestException("Please wait before requesting another code");
+    const html = templates[event as keyof typeof templates]({ name: `${user.firstName} ${user.lastName}`, otp });
+    try {
+      await sendEmail({ recipients: { to: user.email }, subject: "Your Coach Ziad verification code", html });
+    } catch (error) {
+      await this.cacheService.releaseOtp(key, otp);
+      throw new exceptions.ServerException("Unable to send verification email", error);
+    }
+  }
 
-    await services.cacheService.set({
-      key: key,
-      value: otp,
-      ttl: 5 * 60,
-    });
-
-    eventEmitter.emit(event, {
-      recipients: { to: user?.email },
-      otp,
-      name: `${user?.firstName} ${user?.lastName}`,
-    });
+  getOtpKey(userId: string, event: enums.eventEnum): string {
+    switch (event) {
+      case enums.eventEnum.signup: return this.getUserOTPKey(userId);
+      case enums.eventEnum.forget: return this.getUserOTPForgetKey(userId);
+      case enums.eventEnum.fa: return this.getUser2FAKey(userId);
+      default: throw new exceptions.BadRequestException("Invalid OTP purpose");
+    }
   }
 
   // ---------------------- REVOKE TOKEN -----------------------
@@ -125,8 +133,11 @@ export class AuthHelpers {
     const ttl = refresh_ex - iat;
 
     if (ttl > 0) {
-      await services.cacheService.set({
-        key: this.tokenService.getRevokeKey({ userId: data.sub, jti: data.jti }),
+      await this.cacheService.set({
+        key: this.tokenService.getRevokeKey({
+          userId: data.sub,
+          jti: data.jti,
+        }),
         value: 1,
         ttl,
       });
@@ -136,10 +147,10 @@ export class AuthHelpers {
   // ---------------------- WRONG OTP --------------------------
   async wrongOtpHandler(userId: string): Promise<void> {
     const key = this.getUserOtpTriesKey(userId.toString());
-    if (await services.cacheService.exists({ key })) {
-      await services.cacheService.incr({ key });
+    if (await this.cacheService.exists({ key })) {
+      await this.cacheService.incr({ key });
     } else {
-      await services.cacheService.set({ key, value: 1, ttl: 5 * 60 });
+      await this.cacheService.set({ key, value: 1, ttl: 5 * 60 });
     }
     throw new exceptions.BadRequestException("Wrong OTP");
   }
@@ -147,13 +158,13 @@ export class AuthHelpers {
   // ---------------------- BLOCK USER -------------------------
   async blockUser({ userId, userOtpKey }: BlockUserType): Promise<void> {
     const triesKey = this.getUserOtpTriesKey(userId);
-    const userOtpRetries = await services.cacheService.get({
+    const userOtpRetries = await this.cacheService.get({
       key: triesKey,
     });
 
     if (userOtpRetries && Number(userOtpRetries) >= max_retries) {
       if (userOtpKey) {
-        await services.cacheService.del({ key: [userOtpKey] });
+        await this.cacheService.del({ key: [userOtpKey] });
       }
 
       await this.userRepo.updateOne({

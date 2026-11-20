@@ -2,17 +2,12 @@ import * as configService from "../../config/config.service.js";
 import crypto from "crypto";
 import { exceptions } from "../exceptions/index.js";
 import jwt from "jsonwebtoken";
-import {
-  services,
-  repos,
-  enums,
-  type ICreateToken,
-  type ICachedUser,
-} from "../index.js";
-// import { authHelpers } from "../../modules/auth/auth.helper.js";
+import * as enums from "../enums/index.js";
+import { userRepo } from "../repo/user.repo.js";
+import { cacheService } from "./cache.service.js";
+import { authHelpers } from "../../modules/auth/auth.helpers.js";
+import type { ICreateToken, ICachedUser } from "../interface/token.interface.js";
 import { Types } from "mongoose";
-import { type AuthHelpers, authHelpers } from "../../modules/auth/index.js";
-import type { HUser } from "../../database/index.js";
 
 // ---------------------- FUNCTIONS TYPES --------------------
 type CreateTokenType = {
@@ -38,14 +33,9 @@ type GetRevokeKeyType = {
 // -----------------------------------------------------------
 
 export class TokenService {
-  private readonly userRepo: repos.UserRepo;
-  private readonly cacheService: services.CacheService;
-  private readonly authHelpers: AuthHelpers;
-  constructor() {
-    this.userRepo = repos.userRepo;
-    this.cacheService = services.cacheService;
-    this.authHelpers = authHelpers;
-  }
+  private readonly userRepo = userRepo;
+  private readonly cacheService = cacheService;
+  private get authHelpers() { return authHelpers; }
 
   createToken({
     userId,
@@ -121,11 +111,11 @@ export class TokenService {
 
     const userKey = this.authHelpers.getUserKey(userId);
     if (
-      await services.cacheService.exists({
+      await this.cacheService.exists({
         key: userKey,
       })
     ) {
-      const cachedUser = await services.cacheService.get<ICachedUser>({
+      const cachedUser = await this.cacheService.get<ICachedUser>({
         key: userKey,
       });
       if (
@@ -173,7 +163,7 @@ export class TokenService {
     }
 
     // cache loged in user for 30 sec
-    await services.cacheService.set({
+    await this.cacheService.set({
       key: userKey,
       value: user,
       ttl: 30,

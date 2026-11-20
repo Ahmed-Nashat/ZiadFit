@@ -21,6 +21,65 @@ export class CacheService {
     }
   }
 
+  async reserveOtp(
+    key: string,
+    limitKey: string,
+    otp: string,
+    limit: number,
+  ): Promise<number> {
+    return Number(
+      await this.client.eval(
+        `
+      if redis.call('EXISTS', KEYS[1]) == 1 then return -1 end
+      local count = tonumber(redis.call('GET', KEYS[2]) or '0')
+      if count >= tonumber(ARGV[2]) then return -2 end
+      count = redis.call('INCR', KEYS[2])
+      if count == 1 then redis.call('EXPIRE', KEYS[2], 600) end
+      redis.call('SET', KEYS[1], ARGV[1], 'EX', 300)
+      return count
+    `,
+        { keys: [key, limitKey], arguments: [otp, String(limit)] },
+      ),
+    );
+  }
+
+  async releaseOtp(key: string, otp: string): Promise<void> {
+    await this.client.eval(
+      `
+      if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end
+      return 0
+    `,
+      { keys: [key], arguments: [otp] },
+    );
+  }
+
+  async consumeOtp(
+    key: string,
+    attemptsKey: string,
+    otp: string,
+    maxAttempts: number,
+  ): Promise<number> {
+    return Number(
+      await this.client.eval(
+        `
+      local stored = redis.call('GET', KEYS[1])
+      if not stored then return 0 end
+      local attempts = tonumber(redis.call('GET', KEYS[2]) or '0')
+      if attempts >= tonumber(ARGV[2]) then return -1 end
+      if stored ~= ARGV[1] then
+        attempts = redis.call('INCR', KEYS[2])
+        if attempts == 1 then redis.call('EXPIRE', KEYS[2], 300) end
+        if attempts >= tonumber(ARGV[2]) then return -1 end
+        return 0
+      end
+      redis.call('DEL', KEYS[1], KEYS[2])
+      return 1
+    `,
+        { keys: [key, attemptsKey], arguments: [otp, String(maxAttempts)] },
+      ),
+    );
+  }
+
   async set({
     key,
     value,

@@ -1,20 +1,17 @@
 import {
-  services,
-  eventEmitter,
-  repos,
   enums,
   exceptions,
   security,
+  repos,
+  services,
 } from "../../common/index.js";
-import { EventEmitter } from "node:events";
-import { signUpDTO, signInDTO } from "./index.js";
+import { authHelpers } from "./auth.helpers.js";
+import type { signUpDTO, signInDTO } from "./dto/index.js";
+import { max_retries } from "../../config/config.service.js";
+import type { HUser } from "../../database/models/user.model.js";
+import { Types } from "mongoose";
 
 // ---------------------- FUNCTIONS TYPES --------------------
-interface ILoginWithGoogleType {
-  idToken: string;
-  issuer: string;
-}
-
 interface IRefreshTokenType {
   refreshToken: string;
   issuer: string;
@@ -45,25 +42,14 @@ interface IForgetPasswordType {
   newPassword: string;
   cPassword: string;
 }
-
-interface IVerify2FALogin {
-  userId: string;
-  issuer: string;
-  otp: number;
-}
 // -----------------------------------------------------------
 
 class AuthService {
-  private readonly userRepo: repos.UserRepo;
-  private readonly chacheService: services.CacheService;
-  private readonly eventEmitter: EventEmitter;
+  private readonly userRepo = repos.userRepo;
+  private readonly chacheService = services.cacheService;
+  private readonly authHelpers = authHelpers;
 
-  constructor() {
-    this.userRepo = repos.userRepo;
-    this.chacheService = services.cacheService;
-    this.eventEmitter = eventEmitter;
-  }
-
+  // ---------------------- SIGNUP -----------------------------
   async createUser({ userData }: ICreateUserType): Promise<void> {
     const { email, password } = userData;
     const isExists = await this.userRepo.findByEmail({ email });
@@ -83,7 +69,67 @@ class AuthService {
         DOB: new Date(userData.DOB),
       },
     });
-    return;
+    await this.authHelpers.createAndSendOtp({
+      user,
+      event: enums.eventEnum.signup,
+    });
+  }
+
+  // ---------------------- RESEND OTP -------------------------
+  async resendOtp({ email, topic }: IResendOTPType): Promise<string> {
+    if (
+      ![
+        enums.eventEnum.signup,
+        enums.eventEnum.forget,
+        enums.eventEnum.fa,
+      ].includes(topic)
+    ) {
+      throw new exceptions.BadRequestException("Invalid OTP purpose");
+    }
+    const user = await this.userRepo.findByEmail({ email });
+    if (!user) throw new exceptions.NotFoundException("User not found");
+    if (topic === enums.eventEnum.signup && user.emailVerifiedAt) {
+      throw new exceptions.BadRequestException("Email is already verified");
+    }
+    await this.authHelpers.createAndSendOtp({ user, event: topic });
+    return "Verification code sent";
+  }
+
+  // ---------------------- CONFIRM EMAIL ----------------------
+  async confirmEmail({ email, otp }: IConfirmEmailtype): Promise<HUser | void> {
+    let user: HUser | null = await this.authHelpers.checkUser({
+      email,
+    });
+    if (!user) throw new exceptions.NotFoundException("User not found");
+    if (user.emailVerifiedAt)
+      throw new exceptions.BadRequestException("Email is already verified");
+    if (!Number.isInteger(max_retries) || max_retries < 1)
+      throw new exceptions.ServerException("OTP retry limit is not configured");
+    const userId = user.id;
+    const userOtpKey = this.authHelpers.getOtpKey(
+      userId,
+      enums.eventEnum.signup,
+    );
+    const result = await this.chacheService.consumeOtp(
+      userOtpKey,
+      this.authHelpers.getUserOtpTriesKey(userId),
+      otp,
+      max_retries,
+    );
+    if (result === -1)
+      throw new exceptions.TooManyRequestException(
+        "Too many attempts. Please wait before trying again",
+      );
+    if (result !== 1)
+      throw new exceptions.BadRequestException(
+        "Invalid or expired verification code",
+      );
+    user = await this.userRepo.findByIdAndUpdate({
+      id: new Types.ObjectId(userId),
+      update: { emailVerifiedAt: new Date() },
+    });
+    if (!user) throw new exceptions.NotFoundException("User not found");
+    return user;
   }
 }
 

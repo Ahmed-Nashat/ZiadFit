@@ -2,7 +2,7 @@ import { Attachment, createTransport, Transporter } from "nodemailer";
 import * as configService from "../../config/config.service.js";
 
 const transporter: Transporter = createTransport({
-  service: "email",
+  service: "gmail",
   auth: {
     user: configService.app_email,
     pass: configService.app_password,
