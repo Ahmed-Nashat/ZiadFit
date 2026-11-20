@@ -1,10 +1,12 @@
 export { exceptions } from "./exceptions/index.js";
 export * as enums from "./enums/index.js";
-export {
+export type {
+  IError,
+  IResponse,
   IUser,
-  IQuestionnaire,
-  IQuestionnaireAnswers,
   IPgginate,
+  ICreateToken,
+  ICachedUser,
 } from "./interface/index.js";
 export { eventEmitter } from "./events/index.js";
 export { generalFields } from "./utils/index.js";
