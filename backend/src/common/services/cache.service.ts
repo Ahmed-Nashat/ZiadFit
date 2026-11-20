@@ -5,12 +5,15 @@ export class CacheService {
   private readonly client: RedisClientType;
   constructor() {
     this.client = createClient({ url: redis_uri });
-    this.connect();
+
+    this.client.on("error", (error) => {
+      console.error("Redis client error:", error.message);
+    });
   }
 
   async connect() {
     try {
-      this.client.connect();
+      await this.client.connect();
       console.info("Redis connected");
     } catch (e) {
       console.info("Redis connection failed");

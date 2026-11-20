@@ -8,6 +8,7 @@ export type {
   ICreateToken,
   ICachedUser,
 } from "./interface/index.js";
+export { respopnseFormatter, validator } from "./middleware/index.js";
 export { eventEmitter } from "./events/index.js";
 export { generalFields } from "./utils/index.js";
 export * as services from "./services/index.js";

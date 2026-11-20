@@ -1,2 +1,3 @@
-export * as validator from "./auth.validation.js";
-export {signInDTO,signUpDTO} from './dto/index.js'
+export * as authValidation from "./auth.validation.js";
+export { signInDTO, signUpDTO } from "./dto/index.js";
+export {authRouter} from './auth.controller.js'

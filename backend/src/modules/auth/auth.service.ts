@@ -86,3 +86,5 @@ class AuthService {
     return;
   }
 }
+
+export const authService = new AuthService();

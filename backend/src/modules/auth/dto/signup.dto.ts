@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { validator } from "../index.js";
+import { authValidation } from "../index.js";
 
 // export type signUpDTO = {
 //   name: string;
@@ -10,5 +10,5 @@ import { validator } from "../index.js";
 // save the body of the "signupSchema" to the "signUpDTO" so we used "ReturnType"
 // infer take zod schema and retrun a type from it
 export type signUpDTO = z.infer<
-  ReturnType<typeof validator.signupSchema>
+  ReturnType<typeof authValidation.signupSchema>
 >["body"];
