@@ -8,7 +8,7 @@ import { UnauthorizedException } from "../exceptions/application.exception.js";
 import jwt from "jsonwebtoken";
 
 // Basic authentication allows an unverified user to confirm their email.
-export const authenticate: RequestHandler = async (req, _res, next) => {
+const authenticateRequest = (allowSuspended: boolean): RequestHandler => async (req, _res, next) => {
   const authorization = req.headers.authorization;
   const match = authorization?.match(/^(Basic|Bearer)\s+(\S+)$/i);
   if (!match) throw new UnauthorizedException("Authentication required");
@@ -47,9 +47,12 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
     if (!user) throw new UnauthorizedException("Invalid token");
   }
 
-  if (user.accountStatus === accountStatusEnum.suspended) {
+  if (!allowSuspended && user.accountStatus === accountStatusEnum.suspended) {
     throw new UnauthorizedException("Account is suspended");
   }
   req.user = user;
   next();
 };
+
+export const authenticate = authenticateRequest(false);
+export const authenticateProfile = authenticateRequest(true);

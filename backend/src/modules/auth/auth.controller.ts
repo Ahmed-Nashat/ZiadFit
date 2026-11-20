@@ -8,11 +8,41 @@ import {
 } from "express";
 import { authValidation } from "./index.js";
 import { eventEnum } from "../../common/enums/events.enum.js";
+import { authenticateProfile } from "../../common/middleware/auth.js";
+import { UnauthorizedException } from "../../common/exceptions/application.exception.js";
 
 export const authRouter = Router({
   caseSensitive: true,
   strict: true,
 });
+
+authRouter.get(
+  "/me",
+  (req, _res, next) => {
+    if (!/^Bearer\s+\S+$/i.test(req.headers.authorization ?? "")) {
+      throw new UnauthorizedException("Bearer token required");
+    }
+    next();
+  },
+  authenticateProfile,
+  respopnseFormatter(async (req: Request) => {
+    const user = req.user;
+    if (!user) throw new UnauthorizedException("Authentication required");
+    return {
+      status: 200,
+      msg: "Profile retrieved",
+      data: {
+        id: String(user._id),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        accountStatus: user.accountStatus,
+        emailVerifiedAt: user.emailVerifiedAt,
+      },
+    };
+  }),
+);
 
 // ---------------------- SIGNUP -----------------------------
 authRouter.post(
