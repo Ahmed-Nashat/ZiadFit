@@ -27,4 +27,4 @@ A full-stack fitness coaching platform for managing personalized workout plans, 
 
 ---
 
-**Coach Zyaead — Train Hard. Track Everything.**
+**Coach Ziad — Train Hard. Track Everything.**
