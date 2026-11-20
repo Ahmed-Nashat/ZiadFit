@@ -5,6 +5,6 @@ export interface ICreateToken {
 
 export interface ICachedUser {
   _id: string;
-  credintialsChangedAt?: number;
+  credentialsChangedAt?: number;
   [key: string]: unknown;
 }
