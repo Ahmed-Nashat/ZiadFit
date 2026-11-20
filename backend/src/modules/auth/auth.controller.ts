@@ -8,16 +8,6 @@ import {
 } from "express";
 import { authValidation } from "./index.js";
 import { eventEnum } from "../../common/enums/events.enum.js";
-import { UnauthorizedException } from "../../common/exceptions/application.exception.js";
-import { authenticate } from "../../common/middleware/auth.js";
-
-const getAuthenticatedEmail = (req: Request): string => {
-  const email = req.user?.email;
-  if (typeof email !== "string" || !email.trim()) {
-    throw new UnauthorizedException("Authentication required");
-  }
-  return email;
-};
 
 export const authRouter = Router({
   caseSensitive: true,
@@ -42,10 +32,23 @@ authRouter.post(
 
 // ---------------------- RESEND OTP -------------------------
 authRouter.post(
-  "/resend-otp",
-  authenticate,
+  "/login",
+  validator(authValidation.loginSchema),
   respopnseFormatter(async (req: Request) => {
-    await authService.resendOtp({ email: getAuthenticatedEmail(req), topic: eventEnum.signup });
+    const tokens = await authService.login({
+      userData: req.validate.body,
+      issuer: `${req.protocol}://${req.get("host")}`,
+    });
+    return { status: 200, data: tokens, msg: "Logged in" };
+  }),
+);
+
+// ---------------------- RESEND OTP -------------------------
+authRouter.post(
+  "/resend-otp",
+  validator(authValidation.resendSignupOtpSchema),
+  respopnseFormatter(async (req: Request) => {
+    await authService.resendOtp({ email: req.validate.body.email, topic: eventEnum.signup });
     return { status: 200, data: {}, msg: "Verification code sent" };
   }),
 );
@@ -53,10 +56,9 @@ authRouter.post(
 // ---------------------- CONFIRM EMAIL ----------------------
 authRouter.post(
   "/confirm-email",
-  authenticate,
   validator(authValidation.confirmEmailSchema),
   respopnseFormatter(async (req: Request) => {
-    await authService.confirmEmail({ email: getAuthenticatedEmail(req), otp: req.validate.body.otp });
+    await authService.confirmEmail(req.validate.body);
     return { status: 200, data: {}, msg: "Email verified" };
   }),
 );

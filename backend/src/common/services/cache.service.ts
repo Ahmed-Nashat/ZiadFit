@@ -21,6 +21,14 @@ export class CacheService {
     }
   }
 
+  async incrementWithExpiry(key: string, ttl: number): Promise<number> {
+    return Number(await this.client.eval(`
+      local count = redis.call('INCR', KEYS[1])
+      if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+      return count
+    `, { keys: [key], arguments: [String(ttl)] }));
+  }
+
   async reserveOtp(
     key: string,
     limitKey: string,

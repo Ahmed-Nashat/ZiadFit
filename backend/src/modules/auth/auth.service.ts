@@ -49,6 +49,49 @@ class AuthService {
   private readonly chacheService = services.cacheService;
   private readonly authHelpers = authHelpers;
 
+  // ---------------------- LOGIN ------------------------------
+  async login({ userData, issuer }: ILoginType) {
+    const { email, password } = userData;
+    const user = await this.userRepo.findByEmail({
+      email,
+      includePassword: true,
+    });
+    if (!user)
+      throw new exceptions.UnauthorizedException("Invalid email or password");
+
+    const triesKey = this.authHelpers.getUserLoginTriesKey(user.id);
+    if (!Number.isInteger(max_retries) || max_retries < 1) {
+      throw new exceptions.ServerException(
+        "Login retry limit is not configured",
+      );
+    }
+    const attempts = Number(await this.chacheService.get({ key: triesKey }));
+    if (attempts >= max_retries) {
+      throw new exceptions.TooManyRequestException(
+        "Too many failed attempts. Please try again later.",
+      );
+    }
+    try {
+      await security.compare({
+        plainText: password,
+        cipherText: user.password,
+      });
+    } catch (error) {
+      if (error instanceof exceptions.BadRequestException) {
+        await this.authHelpers.handleFailedLogin(user.id);
+      }
+      throw error;
+    }
+
+    if (!user.emailVerifiedAt) {
+      throw new exceptions.UnauthorizedException(
+        "Please verify your email before logging in",
+      );
+    }
+    await this.chacheService.del({ key: [triesKey] });
+    return this.authHelpers.verifyLogin({ user, issuer });
+  }
+
   // ---------------------- SIGNUP -----------------------------
   async createUser({ userData }: ICreateUserType): Promise<void> {
     const { email, password } = userData;

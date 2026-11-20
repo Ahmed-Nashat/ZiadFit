@@ -23,11 +23,15 @@ export class UserRepo extends BaseRepo<IUser> {
   async findByEmail({
     email,
     projection = null,
+    includePassword = false,
   }: {
     email: string;
     projection?: ProjectionType<IUser> | null;
+    includePassword?: boolean;
   }) {
-    return await this.model.findOne({ email }, projection);
+    const query = this.model.findOne({ email: email.trim().toLowerCase() }, projection);
+    if (includePassword) query.select("+password");
+    return await query;
   }
 }
 

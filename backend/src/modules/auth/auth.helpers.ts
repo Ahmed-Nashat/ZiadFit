@@ -1,9 +1,17 @@
 import jwt from "jsonwebtoken";
-import { max_retries, max_send_retries, refresh_ex } from "../../config/config.service.js";
+import {
+  max_retries,
+  max_send_retries,
+  refresh_ex,
+} from "../../config/config.service.js";
 import crypto from "crypto";
 import { sendEmail } from "../../common/services/mail.service.js";
-import { signupOtpTemplate, forgetPasswordOtpTemplate, twoFactorOtpTemplate } from "../../common/templates/templates.js";
-import type { HydratedDocument, Types } from "mongoose";
+import {
+  signupOtpTemplate,
+  forgetPasswordOtpTemplate,
+  twoFactorOtpTemplate,
+} from "../../common/templates/templates.js";
+import type { HydratedDocument } from "mongoose";
 import * as enums from "../../common/enums/index.js";
 import { exceptions } from "../../common/exceptions/index.js";
 import { userRepo } from "../../common/repo/user.repo.js";
@@ -39,7 +47,9 @@ type CheckUserType = {
 export class AuthHelpers {
   private readonly userRepo = userRepo;
   private readonly cacheService = cacheService;
-  private get tokenService() { return tokenService; }
+  private get tokenService() {
+    return tokenService;
+  }
 
   generateOtp = (): number => crypto.randomInt(100000, 1000000);
 
@@ -64,28 +74,11 @@ export class AuthHelpers {
 
   async handleFailedLogin(userId: string): Promise<void> {
     const key = this.getUserLoginTriesKey(userId);
-    let tries = 1;
-
-    if (await this.cacheService.exists({ key })) {
-      tries = await this.cacheService.incr({ key });
-    } else {
-      await this.cacheService.set({ key, value: 1, ttl: 15 * 60 });
-    }
+    const tries = await this.cacheService.incrementWithExpiry(key, 15 * 60);
 
     if (tries >= max_retries) {
-      await this.cacheService.del({ key: [key] });
-      await this.userRepo.updateOne({
-        filter: {
-          _id: userId,
-        },
-        update: {
-          $set: {
-            banned: true,
-          },
-        },
-      });
       throw new exceptions.TooManyRequestException(
-        "Too many failed attempts. You got banned, please contact support",
+        "Too many failed attempts. Please try again later.",
       );
     }
     throw new exceptions.BadRequestException("Invalid email or password");
@@ -98,27 +91,51 @@ export class AuthHelpers {
       [enums.eventEnum.forget]: forgetPasswordOtpTemplate,
       [enums.eventEnum.fa]: twoFactorOtpTemplate,
     };
-    if (!(event in templates)) throw new exceptions.BadRequestException("Invalid OTP purpose");
-    if (!Number.isInteger(max_send_retries) || max_send_retries < 1) throw new exceptions.ServerException("OTP send limit is not configured");
+    if (!(event in templates))
+      throw new exceptions.BadRequestException("Invalid OTP purpose");
+    if (!Number.isInteger(max_send_retries) || max_send_retries < 1)
+      throw new exceptions.ServerException("OTP send limit is not configured");
     const otp = String(this.generateOtp());
     const key = this.getOtpKey(user.id, event);
-    const reservation = await this.cacheService.reserveOtp(key, this.getUserSendKey(user.id), otp, max_send_retries);
-    if (reservation < 0) throw new exceptions.TooManyRequestException("Please wait before requesting another code");
-    const html = templates[event as keyof typeof templates]({ name: `${user.firstName} ${user.lastName}`, otp });
+    const reservation = await this.cacheService.reserveOtp(
+      key,
+      this.getUserSendKey(user.id),
+      otp,
+      max_send_retries,
+    );
+    if (reservation < 0)
+      throw new exceptions.TooManyRequestException(
+        "Please wait before requesting another code",
+      );
+    const html = templates[event as keyof typeof templates]({
+      name: `${user.firstName} ${user.lastName}`,
+      otp,
+    });
     try {
-      await sendEmail({ recipients: { to: user.email }, subject: "Your Coach Ziad verification code", html });
+      await sendEmail({
+        recipients: { to: user.email },
+        subject: "Your Coach Ziad verification code",
+        html,
+      });
     } catch (error) {
       await this.cacheService.releaseOtp(key, otp);
-      throw new exceptions.ServerException("Unable to send verification email", error);
+      throw new exceptions.ServerException(
+        "Unable to send verification email",
+        error,
+      );
     }
   }
 
   getOtpKey(userId: string, event: enums.eventEnum): string {
     switch (event) {
-      case enums.eventEnum.signup: return this.getUserOTPKey(userId);
-      case enums.eventEnum.forget: return this.getUserOTPForgetKey(userId);
-      case enums.eventEnum.fa: return this.getUser2FAKey(userId);
-      default: throw new exceptions.BadRequestException("Invalid OTP purpose");
+      case enums.eventEnum.signup:
+        return this.getUserOTPKey(userId);
+      case enums.eventEnum.forget:
+        return this.getUserOTPForgetKey(userId);
+      case enums.eventEnum.fa:
+        return this.getUser2FAKey(userId);
+      default:
+        throw new exceptions.BadRequestException("Invalid OTP purpose");
     }
   }
 
