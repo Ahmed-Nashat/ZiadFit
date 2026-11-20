@@ -34,6 +34,7 @@ export class CacheService {
     limitKey: string,
     otp: string,
     limit: number,
+    pendingPasswordHash?: string,
   ): Promise<number> {
     return Number(
       await this.client.eval(
@@ -44,9 +45,10 @@ export class CacheService {
       count = redis.call('INCR', KEYS[2])
       if count == 1 then redis.call('EXPIRE', KEYS[2], 600) end
       redis.call('SET', KEYS[1], ARGV[1], 'EX', 300)
+      if ARGV[3] ~= '' then redis.call('SET', KEYS[3], ARGV[3], 'EX', 300) end
       return count
     `,
-        { keys: [key, limitKey], arguments: [otp, String(limit)] },
+        { keys: [key, limitKey, `${key}::password`], arguments: [otp, String(limit), pendingPasswordHash ?? ""] },
       ),
     );
   }
@@ -54,11 +56,31 @@ export class CacheService {
   async releaseOtp(key: string, otp: string): Promise<void> {
     await this.client.eval(
       `
-      if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end
+      if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1], KEYS[2]) end
       return 0
     `,
-      { keys: [key], arguments: [otp] },
+      { keys: [key, `${key}::password`], arguments: [otp] },
     );
+  }
+
+  async consumePasswordReset(key: string, attemptsKey: string, otp: string, maxAttempts: number): Promise<string | number> {
+    const result = await this.client.eval(`
+      local stored = redis.call('GET', KEYS[1])
+      local password = redis.call('GET', KEYS[3])
+      if not stored or not password then return 0 end
+      local attempts = tonumber(redis.call('GET', KEYS[2]) or '0')
+      if attempts >= tonumber(ARGV[2]) then return -1 end
+      if stored ~= ARGV[1] then
+        attempts = redis.call('INCR', KEYS[2])
+        if attempts == 1 then redis.call('EXPIRE', KEYS[2], 300) end
+        if attempts >= tonumber(ARGV[2]) then return -1 end
+        return 0
+      end
+      redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])
+      return password
+    `, { keys: [key, attemptsKey, `${key}::password`], arguments: [otp, String(maxAttempts)] });
+    if (typeof result !== "string" && typeof result !== "number") throw new Error("Invalid password reset response");
+    return result;
   }
 
   async consumeOtp(

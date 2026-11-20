@@ -10,6 +10,7 @@ import { authValidation } from "./index.js";
 import { eventEnum } from "../../common/enums/events.enum.js";
 import { authenticateProfile } from "../../common/middleware/auth.js";
 import { UnauthorizedException } from "../../common/exceptions/application.exception.js";
+import { requireBearer } from "../../common/middleware/require-bearer.js";
 
 export const authRouter = Router({
   caseSensitive: true,
@@ -18,12 +19,7 @@ export const authRouter = Router({
 
 authRouter.get(
   "/me",
-  (req, _res, next) => {
-    if (!/^Bearer\s+\S+$/i.test(req.headers.authorization ?? "")) {
-      throw new UnauthorizedException("Bearer token required");
-    }
-    next();
-  },
+  requireBearer,
   authenticateProfile,
   respopnseFormatter(async (req: Request) => {
     const user = req.user;
@@ -47,12 +43,7 @@ authRouter.get(
 // ---------------------- LOGOUT -----------------------------
 authRouter.post(
   "/logout",
-  (req, _res, next) => {
-    if (!/^Bearer\s+\S+$/i.test(req.headers.authorization ?? "")) {
-      throw new UnauthorizedException("Bearer token required");
-    }
-    next();
-  },
+  requireBearer,
   authenticateProfile,
   respopnseFormatter(async (req: Request) => {
     const token = req.headers.authorization!.split(/\s+/)[1]!;
@@ -95,7 +86,10 @@ authRouter.post(
   "/resend-otp",
   validator(authValidation.resendSignupOtpSchema),
   respopnseFormatter(async (req: Request) => {
-    await authService.resendOtp({ email: req.validate.body.email, topic: eventEnum.signup });
+    await authService.resendOtp({
+      email: req.validate.body.email,
+      topic: eventEnum.signup,
+    });
     return { status: 200, data: {}, msg: "Verification code sent" };
   }),
 );
@@ -107,5 +101,27 @@ authRouter.post(
   respopnseFormatter(async (req: Request) => {
     await authService.confirmEmail(req.validate.body);
     return { status: 200, data: {}, msg: "Email verified" };
+  }),
+);
+
+authRouter.post(
+  "/forgot-password",
+  validator(authValidation.forgotPasswordSchema),
+  respopnseFormatter(async (req: Request) => {
+    await authService.forgotPassword(req.validate.body);
+    return {
+      status: 200,
+      data: {},
+      msg: " a verification code has been sent",
+    };
+  }),
+);
+
+authRouter.post(
+  "/reset-password",
+  validator(authValidation.verifyPasswordResetSchema),
+  respopnseFormatter(async (req: Request) => {
+    await authService.resetPassword(req.validate.body);
+    return { status: 200, data: {}, msg: "Password updated" };
   }),
 );

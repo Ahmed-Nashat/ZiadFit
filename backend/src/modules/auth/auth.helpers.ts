@@ -27,6 +27,7 @@ import { Types } from "mongoose";
 type CreateAndSendOtpType = {
   user: HydratedDocument<IUser>;
   event: enums.eventEnum;
+  pendingPasswordHash?: string;
 };
 
 type BlockUserType = {
@@ -87,7 +88,7 @@ export class AuthHelpers {
   }
 
   // ---------------------- CREATE & SEND OTP ------------------
-  async createAndSendOtp({ user, event }: CreateAndSendOtpType): Promise<void> {
+  async createAndSendOtp({ user, event, pendingPasswordHash }: CreateAndSendOtpType): Promise<void> {
     const templates = {
       [enums.eventEnum.signup]: signupOtpTemplate,
       [enums.eventEnum.forget]: forgetPasswordOtpTemplate,
@@ -104,6 +105,7 @@ export class AuthHelpers {
       this.getUserSendKey(user.id),
       otp,
       max_send_retries,
+      pendingPasswordHash,
     );
     if (reservation < 0)
       throw new exceptions.TooManyRequestException(

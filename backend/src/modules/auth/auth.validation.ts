@@ -89,6 +89,24 @@ export const confirmEmailSchema = () => z.object({
   }),
 });
 
+export const forgotPasswordSchema = () => z.object({
+  body: z.object({
+    email: generalFields.email(),
+    password: generalFields.password(),
+    cPassword: generalFields.cPassword(),
+  }).refine((data) => data.password === data.cPassword, {
+    path: ["cPassword"],
+    message: "Passwords do not match.",
+  }),
+});
+
+export const verifyPasswordResetSchema = () => z.object({
+  body: z.object({
+    email: generalFields.email(),
+    otp: z.string().regex(/^\d{6}$/, "OTP must contain six digits"),
+  }),
+});
+
 export const refreshTokenSchema = () =>
   z.object({
     headers: generalFields.headers().passthrough(),

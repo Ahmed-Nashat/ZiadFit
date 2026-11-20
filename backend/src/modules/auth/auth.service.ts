@@ -49,6 +49,30 @@ class AuthService {
   private readonly chacheService = services.cacheService;
   private readonly authHelpers = authHelpers;
 
+  async forgotPassword({ email, password, cPassword }: { email: string; password: string; cPassword: string }): Promise<void> {
+    if (password !== cPassword) throw new exceptions.BadRequestException("Passwords do not match");
+    const user = await this.userRepo.findByEmail({ email });
+    if (!user) return;
+    const pendingPasswordHash = await security.hash({ plainText: password });
+    await this.authHelpers.createAndSendOtp({ user, event: enums.eventEnum.forget, pendingPasswordHash });
+  }
+
+  async resetPassword({ email, otp }: { email: string; otp: string }): Promise<void> {
+    const user = await this.userRepo.findByEmail({ email });
+    if (!user) throw new exceptions.BadRequestException("Invalid or expired verification code");
+    if (!Number.isInteger(max_retries) || max_retries < 1) throw new exceptions.ServerException("OTP retry limit is not configured");
+    const key = this.authHelpers.getUserOTPForgetKey(user.id);
+    const result = await this.chacheService.consumePasswordReset(key, `tries::${key}`, otp, max_retries);
+    if (result === -1) throw new exceptions.TooManyRequestException("Too many attempts. Please wait before trying again");
+    if (typeof result !== "string") throw new exceptions.BadRequestException("Invalid or expired verification code");
+    const updated = await this.userRepo.findByIdAndUpdate({
+      id: user._id,
+      update: { $set: { password: result, credentialsChangedAt: Date.now() } },
+    });
+    if (!updated) throw new exceptions.NotFoundException("User not found");
+    await this.chacheService.del({ key: [this.authHelpers.getUserKey(user.id)] });
+  }
+
   async logout(token: string): Promise<void> {
     await this.authHelpers.revokedToken(token);
   }
