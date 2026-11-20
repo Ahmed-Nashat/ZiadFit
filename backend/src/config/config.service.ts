@@ -10,4 +10,8 @@ config({ path: envFilePath });
 export const db_uri: string = process.env.DB_URI!,
   redis_uri: string = process.env.REDIS_URI!,
   app_email: string = process.env.APP_EMAIL!,
-  app_password: string = process.env.APP_PASSWORD!;
+  app_password: string = process.env.APP_PASSWORD!,
+  hash_salt: number = Number(process.env.HASH_SALT)!,
+  enc_algo: string = process.env.ENC_ALGO!,
+  key: string = process.env.KEY!,
+  iv_length: number = Number(process.env.IV_LENGTH);
