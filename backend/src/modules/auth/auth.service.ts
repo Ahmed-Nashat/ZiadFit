@@ -4,6 +4,7 @@ import {
   repos,
   enums,
   exceptions,
+  security,
 } from "../../common/index.js";
 import { EventEmitter } from "node:events";
 import { signUpDTO, signInDTO } from "./index.js";
@@ -63,14 +64,25 @@ class AuthService {
     this.eventEmitter = eventEmitter;
   }
 
-  async createUser({ userData }: ICreateUserType) {
+  async createUser({ userData }: ICreateUserType): Promise<void> {
     const { email, password } = userData;
-    const isExists = await this.userRepo.findOne({
-      filter: {
-        email,
+    const isExists = await this.userRepo.findByEmail({ email });
+    if (isExists)
+      throw new exceptions.ConflictException("This email is already exists");
+
+    if (typeof userData?.phoneNumber !== "string")
+      throw new exceptions.ServerException("Invalid phone number type");
+    const hashedPassword = await security.hash({ plainText: password });
+    const encryptedPhoneNumber = security.encrypting(userData.phoneNumber);
+
+    const user = await this.userRepo.create({
+      data: {
+        ...userData,
+        password: hashedPassword,
+        phoneNumber: encryptedPhoneNumber,
+        DOB: new Date(userData.DOB),
       },
     });
-    if (isExists)
-      throw new exceptions.ConflictException("this email is alredy exists");
+    return;
   }
 }
