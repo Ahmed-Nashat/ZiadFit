@@ -49,6 +49,10 @@ class AuthService {
   private readonly chacheService = services.cacheService;
   private readonly authHelpers = authHelpers;
 
+  async logout(token: string): Promise<void> {
+    await this.authHelpers.revokedToken(token);
+  }
+
   // ---------------------- LOGIN ------------------------------
   async login({ userData, issuer }: ILoginType) {
     const { email, password } = userData;

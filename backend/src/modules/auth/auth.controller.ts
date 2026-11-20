@@ -44,6 +44,23 @@ authRouter.get(
   }),
 );
 
+// ---------------------- LOGOUT -----------------------------
+authRouter.post(
+  "/logout",
+  (req, _res, next) => {
+    if (!/^Bearer\s+\S+$/i.test(req.headers.authorization ?? "")) {
+      throw new UnauthorizedException("Bearer token required");
+    }
+    next();
+  },
+  authenticateProfile,
+  respopnseFormatter(async (req: Request) => {
+    const token = req.headers.authorization!.split(/\s+/)[1]!;
+    await authService.logout(token);
+    return { status: 200, data: {}, msg: "Logged out" };
+  }),
+);
+
 // ---------------------- SIGNUP -----------------------------
 authRouter.post(
   "/signup",

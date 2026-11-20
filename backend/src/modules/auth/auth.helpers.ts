@@ -3,6 +3,7 @@ import {
   max_retries,
   max_send_retries,
   refresh_ex,
+  access_ex,
 } from "../../config/config.service.js";
 import crypto from "crypto";
 import { sendEmail } from "../../common/services/mail.service.js";
@@ -20,6 +21,7 @@ import { tokenService } from "../../common/services/token.service.js";
 import { eventEmitter } from "../../common/events/email.events.js";
 import type { IUser } from "../../common/interface/user.interface.js";
 import type { ICreateToken } from "../../common/interface/token.interface.js";
+import { Types } from "mongoose";
 
 // ---------------------- FUNCTIONS TYPES --------------------
 type CreateAndSendOtpType = {
@@ -145,9 +147,11 @@ export class AuthHelpers {
     if (!data || !data.iat || !data.sub || !data.jti)
       throw new exceptions.BadRequestException("Token not valid");
 
-    const currentTimeInSec = Math.ceil(Date.now() / 1000);
-    const iat: number = currentTimeInSec - data.iat;
-    const ttl = refresh_ex - iat;
+    const maxLifetime = Math.max(refresh_ex, access_ex);
+    if (!Number.isFinite(maxLifetime) || maxLifetime <= 0) {
+      throw new exceptions.ServerException("Token lifetime is not configured");
+    }
+    const ttl = Math.ceil(data.iat + maxLifetime - Date.now() / 1000);
 
     if (ttl > 0) {
       await this.cacheService.set({
@@ -231,7 +235,7 @@ export class AuthHelpers {
     let user: HydratedDocument<IUser> | null = null;
 
     if (id) {
-      // user = await userRepo.findById({ id });
+      user = await userRepo.findById({ id: new Types.ObjectId(id) });
     } else if (email) {
       user = await this.userRepo.findByEmail({ email });
     }
