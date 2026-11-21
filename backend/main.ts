@@ -22,7 +22,7 @@ app.get("/", (req: Request, res: Response, next: NextFunction): Response => {
 });
 
 app.use("/auth", routers.authRouter);
-// app.use("/user", routers.userRoter);
+app.use("/user", routers.userRouter);
 
 app.use(errorHandler);
 app.listen(3000, () => {
