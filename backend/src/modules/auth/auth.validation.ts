@@ -106,8 +106,3 @@ export const verifyPasswordResetSchema = () => z.object({
     otp: z.string().regex(/^\d{6}$/, "OTP must contain six digits"),
   }),
 });
-
-export const refreshTokenSchema = () =>
-  z.object({
-    headers: generalFields.headers().passthrough(),
-  });

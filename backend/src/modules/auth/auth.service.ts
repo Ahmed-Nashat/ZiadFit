@@ -5,11 +5,13 @@ import {
   repos,
   services,
 } from "../../common/index.js";
-import { authHelpers } from "./auth.helpers.js";
+import { AuthHelpers, authHelpers } from "./auth.helpers.js";
 import type { signUpDTO, signInDTO } from "./dto/index.js";
 import { max_retries } from "../../config/config.service.js";
 import type { HUser } from "../../database/models/user.model.js";
 import { Types } from "mongoose";
+import jwt from "jsonwebtoken";
+import { access_ex, refresh_ex } from "../../config/config.service.js";
 
 // ---------------------- FUNCTIONS TYPES --------------------
 interface IRefreshTokenType {
@@ -45,36 +47,143 @@ interface IForgetPasswordType {
 // -----------------------------------------------------------
 
 class AuthService {
-  private readonly userRepo = repos.userRepo;
-  private readonly chacheService = services.cacheService;
-  private readonly authHelpers = authHelpers;
+  private readonly userRepo: repos.UserRepo;
+  private readonly chacheService: services.CacheService;
+  private readonly authHelpers: AuthHelpers;
+  private readonly tokenService: services.TokenService;
 
-  async forgotPassword({ email, password, cPassword }: { email: string; password: string; cPassword: string }): Promise<void> {
-    if (password !== cPassword) throw new exceptions.BadRequestException("Passwords do not match");
+  constructor() {
+    this.userRepo = repos.userRepo;
+    this.authHelpers = authHelpers;
+    this.chacheService = services.cacheService;
+    this.tokenService = services.tokenService;
+  }
+
+  async forgotPassword({
+    email,
+    password,
+    cPassword,
+  }: {
+    email: string;
+    password: string;
+    cPassword: string;
+  }): Promise<void> {
+    if (password !== cPassword)
+      throw new exceptions.BadRequestException("Passwords do not match");
     const user = await this.userRepo.findByEmail({ email });
     if (!user) return;
     const pendingPasswordHash = await security.hash({ plainText: password });
-    await this.authHelpers.createAndSendOtp({ user, event: enums.eventEnum.forget, pendingPasswordHash });
+    await this.authHelpers.createAndSendOtp({
+      user,
+      event: enums.eventEnum.forget,
+      pendingPasswordHash,
+    });
   }
 
-  async resetPassword({ email, otp }: { email: string; otp: string }): Promise<void> {
+  async resetPassword({
+    email,
+    otp,
+  }: {
+    email: string;
+    otp: string;
+  }): Promise<void> {
     const user = await this.userRepo.findByEmail({ email });
-    if (!user) throw new exceptions.BadRequestException("Invalid or expired verification code");
-    if (!Number.isInteger(max_retries) || max_retries < 1) throw new exceptions.ServerException("OTP retry limit is not configured");
+    if (!user)
+      throw new exceptions.BadRequestException(
+        "Invalid or expired verification code",
+      );
+    if (!Number.isInteger(max_retries) || max_retries < 1)
+      throw new exceptions.ServerException("OTP retry limit is not configured");
     const key = this.authHelpers.getUserOTPForgetKey(user.id);
-    const result = await this.chacheService.consumePasswordReset(key, `tries::${key}`, otp, max_retries);
-    if (result === -1) throw new exceptions.TooManyRequestException("Too many attempts. Please wait before trying again");
-    if (typeof result !== "string") throw new exceptions.BadRequestException("Invalid or expired verification code");
+    const result = await this.chacheService.consumePasswordReset(
+      key,
+      `tries::${key}`,
+      otp,
+      max_retries,
+    );
+    if (result === -1)
+      throw new exceptions.TooManyRequestException(
+        "Too many attempts. Please wait before trying again",
+      );
+    if (typeof result !== "string")
+      throw new exceptions.BadRequestException(
+        "Invalid or expired verification code",
+      );
     const updated = await this.userRepo.findByIdAndUpdate({
       id: user._id,
       update: { $set: { password: result, credentialsChangedAt: Date.now() } },
     });
     if (!updated) throw new exceptions.NotFoundException("User not found");
-    await this.chacheService.del({ key: [this.authHelpers.getUserKey(user.id)] });
+    await this.chacheService.del({
+      key: [this.authHelpers.getUserKey(user.id)],
+    });
   }
 
   async logout(token: string): Promise<void> {
     await this.authHelpers.revokedToken(token);
+  }
+
+  async refreshToken({ refreshToken, issuer }: IRefreshTokenType) {
+    const payload = jwt.decode(refreshToken);
+    const audience: unknown =
+      payload && typeof payload === "object" ? payload.aud : undefined;
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      typeof payload.sub !== "string" ||
+      typeof payload.jti !== "string" ||
+      typeof payload.iat !== "number" ||
+      typeof payload.exp !== "number" ||
+      (audience !== enums.roleEnum.client &&
+        audience !== enums.roleEnum.coach) ||
+      payload.exp <= Math.floor(Date.now() / 1000)
+    ) {
+      throw new exceptions.UnauthorizedException("Invalid refresh token");
+    }
+    let user;
+    try {
+      user = await services.tokenService.verifyToken({
+        token: refreshToken,
+        tokenType: enums.tokenTypesEnum.refresh,
+      });
+    } catch (error) {
+      if (
+        error instanceof jwt.JsonWebTokenError ||
+        error instanceof exceptions.NotFoundException
+      ) {
+        throw new exceptions.UnauthorizedException("Invalid refresh token");
+      }
+      throw error;
+    }
+    if (!user)
+      throw new exceptions.UnauthorizedException("Invalid refresh token");
+    const role = user.role;
+    if (role !== enums.roleEnum.client && role !== enums.roleEnum.coach) {
+      throw new exceptions.UnauthorizedException("Invalid user role");
+    }
+    const ttl = Math.ceil(
+      Math.max(payload.exp, payload.iat + access_ex, payload.iat + refresh_ex) -
+        Date.now() / 1000,
+    );
+    if (!Number.isFinite(ttl) || ttl <= 0)
+      throw new exceptions.UnauthorizedException("Invalid refresh token");
+    const tokens = this.tokenService.createToken({
+      userId: payload.sub,
+      issuer,
+      role,
+    });
+    const revoked = await this.chacheService.revokeOnce(
+      services.tokenService.getRevokeKey({
+        userId: payload.sub,
+        jti: payload.jti,
+      }),
+      ttl,
+    );
+    if (!revoked)
+      throw new exceptions.UnauthorizedException(
+        "Refresh token has already been used",
+      );
+    return tokens;
   }
 
   // ---------------------- LOGIN ------------------------------

@@ -42,6 +42,19 @@ authRouter.get(
 
 // ---------------------- LOGOUT -----------------------------
 authRouter.post(
+  "/refresh-token",
+  requireBearer,
+  respopnseFormatter(async (req: Request) => {
+    const tokens = await authService.refreshToken({
+      refreshToken: req.headers.authorization!.split(/\s+/)[1]!,
+      issuer: `${req.protocol}://${req.get("host")}`,
+    });
+    return { status: 200, data: tokens, msg: "Tokens refreshed" };
+  }),
+);
+
+// ---------------------- LOGOUT -----------------------------
+authRouter.post(
   "/logout",
   requireBearer,
   authenticateProfile,

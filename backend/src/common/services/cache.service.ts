@@ -29,6 +29,10 @@ export class CacheService {
     `, { keys: [key], arguments: [String(ttl)] }));
   }
 
+  async revokeOnce(key: string, ttl: number): Promise<boolean> {
+    return (await this.client.set(key, "1", { NX: true, EX: ttl })) === "OK";
+  }
+
   async reserveOtp(
     key: string,
     limitKey: string,
