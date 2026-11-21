@@ -5,15 +5,13 @@ export interface IQuestionnaire {
   clientId: Types.ObjectId;
   formVersion: number;
   status: questionnaireStatusEnum;
-  submittedAt?: Date;
+  submittedAt: Date;
   reviewedAt?: Date;
   reviewedBy?: Types.ObjectId;
   reviewNotes?: string;
   createdAt: Date;
   updatedAt: Date;
-  revision: number;
-  // to allow saving drafts
-  answers: Partial<IQuestionnaireAnswers>;
+  answers: IQuestionnaireAnswers;
 }
 
 export interface IQuestionnaireAnswers {

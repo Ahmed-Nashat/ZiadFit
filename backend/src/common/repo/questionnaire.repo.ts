@@ -10,17 +10,6 @@ export class QuestionnaireRepo extends BaseRepo<IQuestionnaire> {
   }
 
   // --------------------- FINDERS ---------------------
-  async findDraftByClientId(
-    clientId: Types.ObjectId,
-  ): Promise<IQuestionnaire | null> {
-    return this.findOne({
-      filter: {
-        clientId,
-        status: questionnaireStatusEnum.draft,
-      },
-    });
-  }
-
   async findPendingByClientId(
     clientId: Types.ObjectId,
   ): Promise<IQuestionnaire | null> {
@@ -62,87 +51,14 @@ export class QuestionnaireRepo extends BaseRepo<IQuestionnaire> {
     });
   }
 
-  async createDraft({
+  async createSubmission({
     clientId,
-    answers = {},
+    answers,
   }: {
     clientId: Types.ObjectId;
-    answers?: Partial<IQuestionnaireAnswers>;
-  }): Promise<IQuestionnaire | null> {
-    return this.create({
-      data: {
-        clientId,
-        answers,
-      },
-    });
-  }
-
-  // --------------------- UPDATERS ---------------------
-  async updateDraft({
-    clientId,
-    data,
-    questionnaireId,
-  }: {
-    clientId: Types.ObjectId;
-    questionnaireId: Types.ObjectId;
-    data: Partial<IQuestionnaireAnswers>;
-  }): Promise<IQuestionnaire | null> {
-    const allowedKeys: (keyof IQuestionnaireAnswers)[] = [
-      "primaryGoal", "heightCm", "weightKg", "trainingExp", "trainingDaysPerWeek",
-      "sessionDurationMinutes", "availableEquipment", "injuriesOrRestrictions",
-      "sleepHours", "preferredPlan",
-    ];
-    const entries = Object.entries(data);
-    if (entries.length === 0 || entries.some(([key, value]) => !allowedKeys.includes(key as keyof IQuestionnaireAnswers) || value === undefined)) {
-      throw new TypeError("Provide valid questionnaire answer fields.");
-    }
-    const updates = Object.fromEntries(
-      entries.map(([key, value]) => [`answers.${key}`, value]),
-    );
-    return this.findOneAndUpdate({
-      filter: {
-        _id: questionnaireId,
-        clientId,
-        status: questionnaireStatusEnum.draft,
-      },
-      update: {
-        $set: updates,
-        $inc: {
-          revision: 1,
-        },
-      },
-      options: {
-        runValidators: true,
-      },
-    });
-  }
-
-  async submitDraft({
-    clientId,
-    questionnaireId,
-    revision,
-  }: {
-    clientId: Types.ObjectId;
-    questionnaireId: Types.ObjectId;
-    revision: number;
-  }): Promise<IQuestionnaire | null> {
-    return this.findOneAndUpdate({
-      filter: {
-        _id: questionnaireId,
-        clientId,
-        status: questionnaireStatusEnum.draft,
-        revision,
-      },
-      update: {
-        $set: {
-          status: questionnaireStatusEnum.pending,
-          submittedAt: new Date(),
-        },
-      },
-      options: {
-        runValidators: true,
-      },
-    });
+    answers: IQuestionnaireAnswers;
+  }): Promise<IQuestionnaire> {
+    return this.create({ data: { clientId, answers } });
   }
 
   async markReviewed({

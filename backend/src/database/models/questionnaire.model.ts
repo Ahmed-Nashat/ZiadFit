@@ -17,7 +17,7 @@ const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
     status: {
       type: String,
       enum: Object.values(enums.questionnaireStatusEnum),
-      default: enums.questionnaireStatusEnum.draft,
+      default: enums.questionnaireStatusEnum.pending,
     },
     reviewedBy: {
       type: mongoose.SchemaTypes.ObjectId,
@@ -27,72 +27,67 @@ const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
       type: String,
       trim: true,
     },
-    revision: {
-      type: Number,
-      default: 0,
-    },
     answers: {
       primaryGoal: {
         type: String,
+        required: true,
         trim: true,
       },
       heightCm: {
         type: Number,
+        required: true,
         min: 0,
       },
       weightKg: {
         type: Number,
+        required: true,
         min: 0,
       },
       trainingDaysPerWeek: {
         type: Number,
+        required: true,
         min: 0,
         max: 7,
       },
       trainingExp: {
         type: String,
+        required: true,
         trim: true,
       },
       sessionDurationMinutes: {
         type: Number,
+        required: true,
         min: 0,
       },
       availableEquipment: {
         type: String,
+        required: true,
         trim: true,
       },
       injuriesOrRestrictions: {
         type: String,
+        required: true,
         trim: true,
       },
       sleepHours: {
         type: Number,
+        required: true,
         min: 0,
         max: 24,
       },
       preferredPlan: {
         type: String,
+        required: true,
         trim: true,
       },
     },
-    submittedAt: Date,
+    submittedAt: { type: Date, required: true, default: Date.now },
     reviewedAt: Date,
   },
   {
     strictQuery: true,
     timestamps: true,
     strict: true,
-  },
-);
-
-//So a client can have one draft and still have older pending or reviewed questionnaires
-questionnaireSchema.index(
-  { clientId: 1 },
-  {
-    unique: true,
-    partialFilterExpression: {
-      status: enums.questionnaireStatusEnum.draft,
-    },
   },
 );
 

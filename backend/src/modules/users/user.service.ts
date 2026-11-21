@@ -5,7 +5,6 @@ import { questionnaireRepo } from "../../common/repo/questionnaire.repo.js";
 import { questionnaireStatusEnum } from "../../common/enums/questionnaireStatus.enum.js";
 import { cacheService } from "../../common/services/cache.service.js";
 import { AuthHelpers, authHelpers } from "../auth/auth.helpers.js";
-import { Types } from "mongoose";
 import type { ICachedUser } from "../../common/interface/token.interface.js";
 
 interface IUpdateUser {
@@ -92,8 +91,6 @@ class UserService {
       email: user.email as string,
       includePassword: true,
     });
-    console.log({ account });
-
     await security.compare({
       plainText: currentPassword,
       cipherText: account!.password,
