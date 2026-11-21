@@ -71,6 +71,9 @@ class UserService {
     await cacheService.del({
       key: [authHelpers.getUserKey(user._id.toString())],
     });
+    await cacheService.del({
+      key: [authHelpers.getLoginUserKey(user._id.toString())],
+    });
     return updated;
   }
 
@@ -85,13 +88,19 @@ class UserService {
     newPassword: string;
   }): Promise<void> {
     const userId = user._id;
+    const account = await this.userRepo.findByEmail({
+      email: user.email as string,
+      includePassword: true,
+    });
+    console.log({ account });
+
     await security.compare({
       plainText: currentPassword,
-      cipherText: user.password as string,
+      cipherText: account!.password,
     });
     const password = await security.hash({ plainText: newPassword });
     const updated = await this.userRepo.findOneAndUpdate({
-      filter: { _id: userId, password: user.password as string },
+      filter: { _id: userId },
       update: { $set: { password, credentialsChangedAt: Date.now() } },
       options: { runValidators: true },
     });

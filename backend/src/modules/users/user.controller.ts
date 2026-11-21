@@ -50,7 +50,7 @@ userRouter.put(
 );
 
 // ---------------------- CHANGE PASSWORD --------------------
-userRouter.put(
+userRouter.patch(
   "/change-password",
   authenticate,
   validator(changePasswordSchema),
