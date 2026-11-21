@@ -1,3 +1,3 @@
-export { userUpdateSchema } from "./user.validation.js";
+export { userUpdateSchema, changePasswordSchema } from "./user.validation.js";
 export { userService } from "./user.service.js";
 export { userRouter } from "./user.controller.js";

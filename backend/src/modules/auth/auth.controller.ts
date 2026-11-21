@@ -17,13 +17,13 @@ export const authRouter = Router({
   strict: true,
 });
 
+// ---------------------- GET ME -----------------------------
 authRouter.get(
   "/me",
   requireBearer,
   authenticateProfile,
   respopnseFormatter(async (req: Request) => {
-    const user = req.user;
-    if (!user) throw new UnauthorizedException("Authentication required");
+    const user = req.user!;
     return {
       status: 200,
       msg: "Profile retrieved",
@@ -117,6 +117,7 @@ authRouter.post(
   }),
 );
 
+// ---------------------- FORGET PASSSWORD -------------------
 authRouter.post(
   "/forgot-password",
   validator(authValidation.forgotPasswordSchema),
@@ -130,6 +131,7 @@ authRouter.post(
   }),
 );
 
+// ---------------------- RESET PASSWORD ---------------------
 authRouter.post(
   "/reset-password",
   validator(authValidation.verifyPasswordResetSchema),

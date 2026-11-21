@@ -3,24 +3,29 @@ import { userRepo, UserRepo } from "../../common/repo/user.repo.js";
 import { HUser } from "../../database/index.js";
 import { questionnaireRepo } from "../../common/repo/questionnaire.repo.js";
 import { questionnaireStatusEnum } from "../../common/enums/questionnaireStatus.enum.js";
+import { cacheService } from "../../common/services/cache.service.js";
+import { AuthHelpers, authHelpers } from "../auth/auth.helpers.js";
+import { Types } from "mongoose";
+import type { ICachedUser } from "../../common/interface/token.interface.js";
 
 interface IUpdateUser {
   user: HUser;
   userData: {
-    newPassword: string;
-    cPassword: string;
-    firstName: string;
-    lastName: string;
-    phoneNumber: string;
+    firstName?: string;
+    lastName?: string;
+    phoneNumber?: string;
   };
 }
 
 class UserService {
   private readonly userRepo: UserRepo;
+  private readonly authHelpers: AuthHelpers;
   constructor() {
     this.userRepo = userRepo;
+    this.authHelpers = authHelpers;
   }
 
+  // ---------------------- GET PENDING REQUESTS ---------------
   async getPendingRequests(page?: number, limit?: number) {
     const result = await questionnaireRepo.paggination({
       filter: { status: questionnaireStatusEnum.pending },
@@ -44,29 +49,58 @@ class UserService {
     };
   }
 
+  // ---------------------- UPDATE USER ------------------------
   async updateUser({ user, userData }: IUpdateUser): Promise<IUser | null> {
-    if (!user)
-      throw new exceptions.UnauthorizedException("Authentication required");
-    const encryptedPhoneNumber = security.encrypting(userData.phoneNumber);
-    console.log({
-      password: userData.newPassword,
-      cpassword: userData.cPassword,
-    });
-
-    if (userData.newPassword !== userData.cPassword)
-      throw new exceptions.BadRequestException("Password don't match");
-    const hashedPassword = security.hash({ plainText: userData.newPassword });
-    return await this.userRepo.findOneAndUpdate({
+    const update: Partial<
+      Pick<IUser, "firstName" | "lastName" | "phoneNumber">
+    > = {};
+    if (userData.firstName !== undefined) update.firstName = userData.firstName;
+    if (userData.lastName !== undefined) update.lastName = userData.lastName;
+    if (userData.phoneNumber !== undefined)
+      update.phoneNumber = security.encrypting(userData.phoneNumber);
+    const updated = await this.userRepo.findOneAndUpdate({
       filter: {
         _id: user._id,
       },
       update: {
-        $set: {
-          ...userData,
-          phoneNumber: encryptedPhoneNumber,
-          password: await hashedPassword,
-        },
+        $set: update,
       },
+      options: { runValidators: true },
+    });
+    if (!updated) throw new exceptions.NotFoundException("User not found");
+    await cacheService.del({
+      key: [authHelpers.getUserKey(user._id.toString())],
+    });
+    return updated;
+  }
+
+  // ---------------------- CHANGE PASSWORD --------------------
+  async changePassword({
+    user,
+    currentPassword,
+    newPassword,
+  }: {
+    user: HUser | ICachedUser;
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<void> {
+    const userId = user._id;
+    await security.compare({
+      plainText: currentPassword,
+      cipherText: user.password as string,
+    });
+    const password = await security.hash({ plainText: newPassword });
+    const updated = await this.userRepo.findOneAndUpdate({
+      filter: { _id: userId, password: user.password as string },
+      update: { $set: { password, credentialsChangedAt: Date.now() } },
+      options: { runValidators: true },
+    });
+    if (!updated)
+      throw new exceptions.ConflictException(
+        "Password changed. Please try again.",
+      );
+    await cacheService.del({
+      key: [this.authHelpers.getUserKey(userId.toString())],
     });
   }
 }

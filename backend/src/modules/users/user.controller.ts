@@ -1,16 +1,18 @@
 import { Request, Router } from "express";
-import { userService, userUpdateSchema } from "./index.js";
-import { respopnseFormatter, validator } from "../../common/index.js";
 import {
-  authenticate,
-  authenticateProfile,
-} from "../../common/middleware/auth.js";
+  userService,
+  userUpdateSchema,
+  changePasswordSchema,
+} from "./index.js";
+import { respopnseFormatter, validator } from "../../common/index.js";
+import { authenticate } from "../../common/middleware/auth.js";
 import { roleBasedAccessMiddleware } from "../../common/middleware/authorization.js";
 import { roleEnum } from "../../common/enums/role.enum.js";
 import { HUser } from "../../database/index.js";
 
 export const userRouter = Router();
 
+// ---------------------- GET PENDING REQUESTS ---------------
 userRouter.get(
   "/pending-requests",
   authenticate,
@@ -28,9 +30,10 @@ userRouter.get(
   }),
 );
 
+// ---------------------- UPDATE USER ------------------------
 userRouter.put(
   "/update-user",
-  authenticateProfile,
+  authenticate,
   validator(userUpdateSchema),
   respopnseFormatter(async (req: Request) => {
     const user = req.user as HUser;
@@ -43,5 +46,16 @@ userRouter.put(
       msg: "User updated",
       data: updatedUser,
     };
+  }),
+);
+
+// ---------------------- CHANGE PASSWORD --------------------
+userRouter.put(
+  "/change-password",
+  authenticate,
+  validator(changePasswordSchema),
+  respopnseFormatter(async (req: Request) => {
+    await userService.changePassword({ user: req.user!, ...req.validate.body });
+    return { status: 200, msg: "Password changed. Please log in again." };
   }),
 );
