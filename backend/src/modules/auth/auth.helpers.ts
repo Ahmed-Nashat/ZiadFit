@@ -58,6 +58,9 @@ export class AuthHelpers {
 
   getUserKey = (userId: string): string => `user::${userId?.toString()}`;
 
+  getLoginUserKey = (userId: string): string =>
+    `user::login::${userId?.toString()}`;
+
   getUserOTPKey = (userId: string): string => `otp::${this.getUserKey(userId)}`;
 
   getUserLoginTriesKey = (userId: string): string =>
@@ -77,18 +80,29 @@ export class AuthHelpers {
 
   async handleFailedLogin(userId: string): Promise<void> {
     const key = this.getUserLoginTriesKey(userId);
-    const tries = await this.cacheService.incrementWithExpiry(key, 15 * 60);
+    let tries = 1;
+
+    if (await this.cacheService.exists({ key })) {
+      tries = await this.cacheService.incr({ key });
+    } else {
+      await this.cacheService.set({ key, value: 1, ttl: 15 * 60 });
+    }
 
     if (tries >= max_retries) {
+      await this.cacheService.del({ key: [key] });
       throw new exceptions.TooManyRequestException(
-        "Too many failed attempts. Please try again later.",
+        "Too many failed attempts, try again later",
       );
     }
     throw new exceptions.BadRequestException("Invalid email or password");
   }
 
   // ---------------------- CREATE & SEND OTP ------------------
-  async createAndSendOtp({ user, event, pendingPasswordHash }: CreateAndSendOtpType): Promise<void> {
+  async createAndSendOtp({
+    user,
+    event,
+    pendingPasswordHash,
+  }: CreateAndSendOtpType): Promise<void> {
     const templates = {
       [enums.eventEnum.signup]: signupOtpTemplate,
       [enums.eventEnum.forget]: forgetPasswordOtpTemplate,
@@ -149,18 +163,13 @@ export class AuthHelpers {
     if (!data || !data.iat || !data.sub || !data.jti)
       throw new exceptions.BadRequestException("Token not valid");
 
-    const maxLifetime = Math.max(refresh_ex, access_ex);
-    if (!Number.isFinite(maxLifetime) || maxLifetime <= 0) {
-      throw new exceptions.ServerException("Token lifetime is not configured");
-    }
-    const ttl = Math.ceil(data.iat + maxLifetime - Date.now() / 1000);
+    const currentTimeInSec = Math.ceil(Date.now() / 1000);
+    const iat: number = currentTimeInSec - data.iat;
+    const ttl = refresh_ex - iat;
 
     if (ttl > 0) {
       await this.cacheService.set({
-        key: this.tokenService.getRevokeKey({
-          userId: data.sub,
-          jti: data.jti,
-        }),
+        key: tokenService.getRevokeKey({ userId: data.sub, jti: data.jti }),
         value: 1,
         ttl,
       });

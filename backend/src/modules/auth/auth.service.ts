@@ -4,14 +4,13 @@ import {
   security,
   repos,
   services,
+  ICreateToken,
 } from "../../common/index.js";
 import { AuthHelpers, authHelpers } from "./auth.helpers.js";
 import type { signUpDTO, signInDTO } from "./dto/index.js";
 import { max_retries } from "../../config/config.service.js";
 import type { HUser } from "../../database/models/user.model.js";
 import { Types } from "mongoose";
-import jwt from "jsonwebtoken";
-import { access_ex, refresh_ex } from "../../config/config.service.js";
 
 // ---------------------- FUNCTIONS TYPES --------------------
 interface IRefreshTokenType {
@@ -123,67 +122,33 @@ class AuthService {
     await this.authHelpers.revokedToken(token);
   }
 
-  async refreshToken({ refreshToken, issuer }: IRefreshTokenType) {
-    const payload = jwt.decode(refreshToken);
-    const audience: unknown =
-      payload && typeof payload === "object" ? payload.aud : undefined;
-    if (
-      !payload ||
-      typeof payload !== "object" ||
-      typeof payload.sub !== "string" ||
-      typeof payload.jti !== "string" ||
-      typeof payload.iat !== "number" ||
-      typeof payload.exp !== "number" ||
-      (audience !== enums.roleEnum.client &&
-        audience !== enums.roleEnum.coach) ||
-      payload.exp <= Math.floor(Date.now() / 1000)
-    ) {
-      throw new exceptions.UnauthorizedException("Invalid refresh token");
-    }
-    let user;
-    try {
-      user = await services.tokenService.verifyToken({
-        token: refreshToken,
-        tokenType: enums.tokenTypesEnum.refresh,
-      });
-    } catch (error) {
-      if (
-        error instanceof jwt.JsonWebTokenError ||
-        error instanceof exceptions.NotFoundException
-      ) {
-        throw new exceptions.UnauthorizedException("Invalid refresh token");
-      }
-      throw error;
-    }
-    if (!user)
-      throw new exceptions.UnauthorizedException("Invalid refresh token");
-    const role = user.role;
-    if (role !== enums.roleEnum.client && role !== enums.roleEnum.coach) {
-      throw new exceptions.UnauthorizedException("Invalid user role");
-    }
-    const ttl = Math.ceil(
-      Math.max(payload.exp, payload.iat + access_ex, payload.iat + refresh_ex) -
-        Date.now() / 1000,
-    );
-    if (!Number.isFinite(ttl) || ttl <= 0)
-      throw new exceptions.UnauthorizedException("Invalid refresh token");
-    const tokens = this.tokenService.createToken({
-      userId: payload.sub,
-      issuer,
-      role,
+  // ---------------------- REFRESH TOKEN ----------------------
+  async refreshToken({
+    refreshToken,
+    issuer,
+  }: IRefreshTokenType): Promise<ICreateToken> {
+    const authorization: string = refreshToken;
+    const [token] = authorization.split(" ");
+    if (!token) throw new exceptions.ServerException("Invalid token");
+    const user = await this.tokenService.verifyToken({
+      token,
+      tokenType: enums.tokenTypesEnum.refresh,
     });
-    const revoked = await this.chacheService.revokeOnce(
-      services.tokenService.getRevokeKey({
-        userId: payload.sub,
-        jti: payload.jti,
-      }),
-      ttl,
-    );
-    if (!revoked)
-      throw new exceptions.UnauthorizedException(
-        "Refresh token has already been used",
-      );
-    return tokens;
+    if (!user) throw new exceptions.NotFoundException("User not found");
+
+    // revoke the old refresh token
+    await authHelpers.revokedToken(token);
+    if (typeof user.id !== "string")
+      throw new exceptions.ServerException("Invalid id type");
+    if (!user._id) throw new exceptions.ServerException("Invalid id type");
+    if (typeof user.role !== "number")
+      throw new exceptions.ServerException("Invalid role type");
+
+    return this.tokenService.createToken({
+      userId: user.id,
+      issuer,
+      role: user.role,
+    });
   }
 
   // ---------------------- LOGIN ------------------------------
@@ -202,23 +167,18 @@ class AuthService {
         "Login retry limit is not configured",
       );
     }
-    const attempts = Number(await this.chacheService.get({ key: triesKey }));
-    if (attempts >= max_retries) {
-      throw new exceptions.TooManyRequestException(
-        "Too many failed attempts. Please try again later.",
-      );
-    }
     try {
       await security.compare({
         plainText: password,
         cipherText: user.password,
       });
-    } catch (error) {
-      if (error instanceof exceptions.BadRequestException) {
-        await this.authHelpers.handleFailedLogin(user.id);
-      }
-      throw error;
+    } catch (error: any) {
+      await this.authHelpers.handleFailedLogin(user.id);
     }
+
+    await this.chacheService.del({
+      key: [triesKey],
+    });
 
     if (!user.emailVerifiedAt) {
       throw new exceptions.UnauthorizedException(
@@ -226,6 +186,16 @@ class AuthService {
       );
     }
     await this.chacheService.del({ key: [triesKey] });
+    const loginUserKey = this.authHelpers.getLoginUserKey(user.id);
+    const isCachedUser = await this.chacheService.exists({ key: loginUserKey });
+    if (isCachedUser)
+      return await this.chacheService.get({ key: loginUserKey });
+
+    await this.chacheService.set({
+      key: loginUserKey,
+      value: user,
+      ttl: 30,
+    });
     return this.authHelpers.verifyLogin({ user, issuer });
   }
 
