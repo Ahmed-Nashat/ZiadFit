@@ -12,6 +12,34 @@ import { HUser } from "../../database/index.js";
 
 export const userRouter = Router();
 
+userRouter.get(
+  "/clients",
+  authenticate,
+  roleBasedAccessMiddleware([roleEnum.coach]),
+  respopnseFormatter(async (req: Request) => {
+    const { page, limit } = req.query;
+    return {
+      status: 200,
+      msg: "Clients retrieved",
+      data: await userService.getClients(
+        page === undefined ? undefined : Number(page),
+        limit === undefined ? undefined : Number(limit),
+      ),
+    };
+  }),
+);
+
+userRouter.get(
+  "/clients/:clientId",
+  authenticate,
+  roleBasedAccessMiddleware([roleEnum.coach]),
+  respopnseFormatter(async (req: Request) => ({
+    status: 200,
+    msg: "Client retrieved",
+    data: await userService.getClient(req.params.clientId as string),
+  })),
+);
+
 // ---------------------- GET PENDING REQUESTS ---------------
 userRouter.get(
   "/pending-requests",

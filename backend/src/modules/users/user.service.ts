@@ -6,6 +6,8 @@ import { questionnaireStatusEnum } from "../../common/enums/questionnaireStatus.
 import { cacheService } from "../../common/services/cache.service.js";
 import { AuthHelpers, authHelpers } from "../auth/auth.helpers.js";
 import type { ICachedUser } from "../../common/interface/token.interface.js";
+import { isValidObjectId, Types } from "mongoose";
+import { roleEnum } from "../../common/enums/role.enum.js";
 
 interface IUpdateUser {
   user: HUser;
@@ -22,6 +24,27 @@ class UserService {
   constructor() {
     this.userRepo = userRepo;
     this.authHelpers = authHelpers;
+  }
+
+  async getClients(page?: number, limit?: number) {
+    return this.userRepo.paggination({
+      filter: { role: roleEnum.client },
+      page,
+      limit,
+      select: ["firstName", "lastName", "email", "accountStatus", "createdAt"],
+      options: { sort: { createdAt: -1, _id: -1 } },
+    });
+  }
+
+  async getClient(clientId: string) {
+    if (!isValidObjectId(clientId))
+      throw new exceptions.BadRequestException("Invalid client ID");
+    const client = await this.userRepo.findOne({
+      filter: { _id: new Types.ObjectId(clientId), role: roleEnum.client },
+      projection: { firstName: 1, lastName: 1, email: 1, gender: 1, DOB: 1, accountStatus: 1, createdAt: 1 },
+    });
+    if (!client) throw new exceptions.NotFoundException("Client not found");
+    return client;
   }
 
   // ---------------------- GET PENDING REQUESTS ---------------
@@ -87,17 +110,18 @@ class UserService {
     newPassword: string;
   }): Promise<void> {
     const userId = user._id;
-    const account = await this.userRepo.findByEmail({
-      email: user.email as string,
-      includePassword: true,
+    const account = await this.userRepo.findById({
+      id: new Types.ObjectId(userId.toString()),
+      select: "+password",
     });
+    if (!account) throw new exceptions.NotFoundException("User not found");
     await security.compare({
       plainText: currentPassword,
-      cipherText: account!.password,
+      cipherText: account.password,
     });
     const password = await security.hash({ plainText: newPassword });
     const updated = await this.userRepo.findOneAndUpdate({
-      filter: { _id: userId },
+      filter: { _id: userId, password: account.password },
       update: { $set: { password, credentialsChangedAt: Date.now() } },
       options: { runValidators: true },
     });
@@ -106,7 +130,7 @@ class UserService {
         "Password changed. Please try again.",
       );
     await cacheService.del({
-      key: [this.authHelpers.getUserKey(userId.toString())],
+      key: [this.authHelpers.getUserKey(userId.toString()), this.authHelpers.getLoginUserKey(userId.toString())],
     });
   }
 }
