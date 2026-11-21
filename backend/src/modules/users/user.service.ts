@@ -1,6 +1,8 @@
 import { exceptions, IUser, security } from "../../common/index.js";
 import { userRepo, UserRepo } from "../../common/repo/user.repo.js";
 import { HUser } from "../../database/index.js";
+import { questionnaireRepo } from "../../common/repo/questionnaire.repo.js";
+import { questionnaireStatusEnum } from "../../common/enums/questionnaireStatus.enum.js";
 
 interface IUpdateUser {
   user: HUser;
@@ -19,7 +21,32 @@ class UserService {
     this.userRepo = userRepo;
   }
 
+  async getPendingRequests(page?: number, limit?: number) {
+    const result = await questionnaireRepo.paggination({
+      filter: { status: questionnaireStatusEnum.pending },
+      page,
+      limit,
+      select: ["clientId", "status", "answers", "submittedAt"],
+      options: { sort: { submittedAt: 1, _id: 1 } },
+    });
+    return {
+      ...result,
+      meta: {
+        ...result.meta,
+        totalCount: result.meta.count,
+        currentPage: result.meta.currenPage,
+        remainingCount: Math.max(
+          0,
+          result.meta.count -
+            ((result.meta.currenPage - 1) * (limit ?? 10) + result.data.length),
+        ),
+      },
+    };
+  }
+
   async updateUser({ user, userData }: IUpdateUser): Promise<IUser | null> {
+    if (!user)
+      throw new exceptions.UnauthorizedException("Authentication required");
     const encryptedPhoneNumber = security.encrypting(userData.phoneNumber);
     console.log({
       password: userData.newPassword,

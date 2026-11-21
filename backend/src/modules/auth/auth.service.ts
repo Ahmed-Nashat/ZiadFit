@@ -118,6 +118,7 @@ class AuthService {
     });
   }
 
+  // ---------------------- LOGOUT -----------------------------
   async logout(token: string): Promise<void> {
     await this.authHelpers.revokedToken(token);
   }
