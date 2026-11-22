@@ -5,7 +5,7 @@ import {
   repos,
   enums,
   type ICachedUser,
-  IPgginate
+  IPgginate,
 } from "../../common/index.js";
 import { HUser } from "../../database/index.js";
 import { cacheService } from "../../common/services/cache.service.js";
@@ -45,7 +45,7 @@ class UserService {
     gender?: enums.genderEnum;
     page?: number;
     limit?: number;
-  } = {}):Promise<IPgginate {
+  } = {}): Promise<IPgginate<HUser>> {
     const filter: QueryFilter<IUser> = { role: enums.roleEnum.client };
     if (accountStatus !== undefined) filter.accountStatus = accountStatus;
     if (gender !== undefined) filter.gender = gender;
@@ -72,7 +72,7 @@ class UserService {
   }
 
   // ---------------------- GET CLIENTS ------------------------
-  async getClient(clientId: string) {
+  async getClient(clientId: string): Promise<IUser> {
     if (!isValidObjectId(clientId))
       throw new exceptions.BadRequestException("Invalid client ID");
     const client = await this.userRepo.findOne({
