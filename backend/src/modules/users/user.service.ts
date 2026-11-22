@@ -1,11 +1,11 @@
 import {
-  exceptions,
   IUser,
-  security,
   repos,
   enums,
-  type ICachedUser,
+  security,
   IPgginate,
+  exceptions,
+  type ICachedUser,
 } from "../../common/index.js";
 import { HUser } from "../../database/index.js";
 import { cacheService } from "../../common/services/cache.service.js";
@@ -22,9 +22,9 @@ interface IUpdateUser {
 }
 
 class UserService {
+  private readonly security = security;
   private readonly userRepo: repos.UserRepo;
   private readonly authHelpers: AuthHelpers;
-  private readonly security = security;
   private readonly questionnaireRepo: repos.QuestionnaireRepo;
   constructor() {
     this.userRepo = repos.userRepo;
@@ -40,11 +40,11 @@ class UserService {
     page,
     limit,
   }: {
-    search?: string;
-    accountStatus?: enums.accountStatusEnum;
-    gender?: enums.genderEnum;
     page?: number;
     limit?: number;
+    search?: string;
+    gender?: enums.genderEnum;
+    accountStatus?: enums.accountStatusEnum;
   } = {}): Promise<IPgginate<HUser>> {
     const filter: QueryFilter<IUser> = { role: enums.roleEnum.client };
     if (accountStatus !== undefined) filter.accountStatus = accountStatus;
