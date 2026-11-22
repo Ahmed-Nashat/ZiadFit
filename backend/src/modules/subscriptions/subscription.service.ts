@@ -12,6 +12,13 @@ import {
   type SubscriptionDuration,
 } from "./subscription.duration.js";
 
+interface ILinkExistingSubscription {
+  clientId: string;
+  coachId: string;
+  startAt: Date;
+  endAt: Date;
+}
+
 class SubscriptionService {
   private readonly subscriptionRepo: SubscriptionRepo;
   private readonly userRepo: UserRepo;
@@ -19,6 +26,54 @@ class SubscriptionService {
   constructor() {
     this.subscriptionRepo = subscriptionRepo;
     this.userRepo = userRepo;
+  }
+
+  // ---------------------- LINK EXISTING SUBSCRIBER ---------
+  async linkExistingSubscription({
+    clientId,
+    coachId,
+    startAt,
+    endAt,
+  }: ILinkExistingSubscription) {
+    if (!isValidObjectId(clientId))
+      throw new exceptions.BadRequestException("Invalid client ID");
+    const now = new Date();
+    if (
+      !Number.isFinite(startAt.getTime()) ||
+      !Number.isFinite(endAt.getTime()) ||
+      startAt > now ||
+      endAt <= now ||
+      endAt <= startAt
+    )
+      throw new exceptions.BadRequestException("Provide a valid active subscription period");
+    const client = await this.userRepo.findOne({
+      filter: { _id: new Types.ObjectId(clientId), role: roleEnum.client },
+    });
+    if (!client) throw new exceptions.NotFoundException("Client not found");
+    try {
+      const subscription = await this.subscriptionRepo.create({
+        data: {
+          clientId: new Types.ObjectId(clientId),
+          activatedBy: new Types.ObjectId(coachId),
+          startAt,
+          endAt,
+        },
+      });
+      return {
+        status: subscriptionStatus(subscription),
+        startAt: subscription.startAt,
+        endAt: subscription.endAt,
+      };
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" && error !== null &&
+        "code" in error && error.code === 11000 &&
+        "keyPattern" in error && typeof error.keyPattern === "object" &&
+        error.keyPattern !== null && "clientId" in error.keyPattern
+      )
+        throw new exceptions.ConflictException("Client already has a subscription");
+      throw error;
+    }
   }
 
   async getSubscriptionStatus(clientId: string) {
