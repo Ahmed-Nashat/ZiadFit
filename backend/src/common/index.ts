@@ -7,6 +7,9 @@ export type {
   IPgginate,
   ICreateToken,
   ICachedUser,
+  IQuestionnaire,
+  IQuestionnaireAnswers,
+  ISubscription,
 } from "./interface/index.js";
 export {
   respopnseFormatter,
@@ -15,6 +18,8 @@ export {
   authenticateProfile,
   requireBearer,
   roleBasedAccessMiddleware,
+  errorHandler,
+  requireActiveSubscription,
 } from "./middleware/index.js";
 export { eventEmitter } from "./events/index.js";
 export { generalFields } from "./utils/index.js";

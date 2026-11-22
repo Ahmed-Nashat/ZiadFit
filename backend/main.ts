@@ -6,7 +6,7 @@ import express, {
 import cors from "cors";
 import { dbConnection } from "./src/database/index.js";
 import * as routers from "./src/modules/index.js";
-import { errorHandler } from "./src/common/middleware/error.handler.js";
+import { errorHandler } from "./src/common/index.js";
 import { cacheService } from "./src/common/services/cache.service.js";
 
 const app = express();
@@ -23,6 +23,7 @@ app.get("/", (req: Request, res: Response, next: NextFunction): Response => {
 
 app.use("/auth", routers.authRouter);
 app.use("/user", routers.userRouter);
+app.use("/subscription", routers.subscriptionRouter);
 
 app.use(errorHandler);
 app.listen(3000, () => {
