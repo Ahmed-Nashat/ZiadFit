@@ -1,5 +1,3 @@
-import { respopnseFormatter, validator } from "../../common/index.js";
-import { authService } from "./auth.service.js";
 import {
   Router,
   type NextFunction,
@@ -7,9 +5,10 @@ import {
   type Response,
 } from "express";
 import { authValidation } from "./index.js";
+import { authService } from "./auth.service.js"
 import { eventEnum } from "../../common/enums/events.enum.js";
 import { authenticateProfile } from "../../common/middleware/auth.js";
-import { UnauthorizedException } from "../../common/exceptions/application.exception.js";
+import { exceptions, respopnseFormatter, security, validator } from "../../common/index.js";
 import { requireBearer } from "../../common/middleware/require-bearer.js";
 
 export const authRouter = Router({
@@ -24,6 +23,9 @@ authRouter.get(
   authenticateProfile,
   respopnseFormatter(async (req: Request) => {
     const user = req.user!;
+    if (typeof user.phoneNumber !== "string") {
+      throw new exceptions.ServerException("Profile phone number is unavailable");
+    }
     return {
       status: 200,
       msg: "Profile retrieved",
@@ -32,6 +34,7 @@ authRouter.get(
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        phoneNumber: security.dedecrypting(user.phoneNumber),
         role: user.role,
         accountStatus: user.accountStatus,
         emailVerifiedAt: user.emailVerifiedAt,

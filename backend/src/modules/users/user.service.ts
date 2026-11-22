@@ -1,15 +1,16 @@
-import { exceptions, IUser, security } from "../../common/index.js";
-import { userRepo, UserRepo } from "../../common/repo/user.repo.js";
+import {
+  exceptions,
+  IUser,
+  security,
+  repos,
+  enums,
+  type ICachedUser,
+  IPgginate
+} from "../../common/index.js";
 import { HUser } from "../../database/index.js";
-import { questionnaireRepo } from "../../common/repo/questionnaire.repo.js";
-import { questionnaireStatusEnum } from "../../common/enums/questionnaireStatus.enum.js";
 import { cacheService } from "../../common/services/cache.service.js";
 import { AuthHelpers, authHelpers } from "../auth/auth.helpers.js";
-import type { ICachedUser } from "../../common/interface/token.interface.js";
 import { isValidObjectId, Types, type QueryFilter } from "mongoose";
-import { roleEnum } from "../../common/enums/role.enum.js";
-import { accountStatusEnum } from "../../common/enums/accountStatus.enum.js";
-import { genderEnum } from "../../common/enums/gender.enum.js";
 
 interface IUpdateUser {
   user: HUser;
@@ -21,11 +22,14 @@ interface IUpdateUser {
 }
 
 class UserService {
-  private readonly userRepo: UserRepo;
+  private readonly userRepo: repos.UserRepo;
   private readonly authHelpers: AuthHelpers;
+  private readonly security = security;
+  private readonly questionnaireRepo: repos.QuestionnaireRepo;
   constructor() {
-    this.userRepo = userRepo;
+    this.userRepo = repos.userRepo;
     this.authHelpers = authHelpers;
+    this.questionnaireRepo = repos.questionnaireRepo;
   }
 
   // ---------------------- GET CLIENTS ------------------------
@@ -37,12 +41,12 @@ class UserService {
     limit,
   }: {
     search?: string;
-    accountStatus?: accountStatusEnum;
-    gender?: genderEnum;
+    accountStatus?: enums.accountStatusEnum;
+    gender?: enums.genderEnum;
     page?: number;
     limit?: number;
-  } = {}) {
-    const filter: QueryFilter<IUser> = { role: roleEnum.client };
+  } = {}):Promise<IPgginate {
+    const filter: QueryFilter<IUser> = { role: enums.roleEnum.client };
     if (accountStatus !== undefined) filter.accountStatus = accountStatus;
     if (gender !== undefined) filter.gender = gender;
     if (search) {
@@ -67,12 +71,24 @@ class UserService {
     });
   }
 
+  // ---------------------- GET CLIENTS ------------------------
   async getClient(clientId: string) {
     if (!isValidObjectId(clientId))
       throw new exceptions.BadRequestException("Invalid client ID");
     const client = await this.userRepo.findOne({
-      filter: { _id: new Types.ObjectId(clientId), role: roleEnum.client },
-      projection: { firstName: 1, lastName: 1, email: 1, gender: 1, DOB: 1, accountStatus: 1, createdAt: 1 },
+      filter: {
+        _id: new Types.ObjectId(clientId),
+        role: enums.roleEnum.client,
+      },
+      projection: {
+        firstName: 1,
+        lastName: 1,
+        email: 1,
+        gender: 1,
+        DOB: 1,
+        accountStatus: 1,
+        createdAt: 1,
+      },
     });
     if (!client) throw new exceptions.NotFoundException("Client not found");
     return client;
@@ -80,8 +96,8 @@ class UserService {
 
   // ---------------------- GET PENDING REQUESTS ---------------
   async getPendingRequests(page?: number, limit?: number) {
-    const result = await questionnaireRepo.paggination({
-      filter: { status: questionnaireStatusEnum.pending },
+    const result = await this.questionnaireRepo.paggination({
+      filter: { status: enums.questionnaireStatusEnum.pending },
       page,
       limit,
       select: ["clientId", "status", "answers", "submittedAt"],
@@ -103,14 +119,14 @@ class UserService {
   }
 
   // ---------------------- UPDATE USER ------------------------
-  async updateUser({ user, userData }: IUpdateUser): Promise<IUser | null> {
+  async updateUser({ user, userData }: IUpdateUser) {
     const update: Partial<
       Pick<IUser, "firstName" | "lastName" | "phoneNumber">
     > = {};
     if (userData.firstName !== undefined) update.firstName = userData.firstName;
     if (userData.lastName !== undefined) update.lastName = userData.lastName;
     if (userData.phoneNumber !== undefined)
-      update.phoneNumber = security.encrypting(userData.phoneNumber);
+      update.phoneNumber = this.security.encrypting(userData.phoneNumber);
     const updated = await this.userRepo.findOneAndUpdate({
       filter: {
         _id: user._id,
@@ -122,12 +138,21 @@ class UserService {
     });
     if (!updated) throw new exceptions.NotFoundException("User not found");
     await cacheService.del({
-      key: [authHelpers.getUserKey(user._id.toString())],
+      key: [this.authHelpers.getUserKey(user._id.toString())],
     });
     await cacheService.del({
-      key: [authHelpers.getLoginUserKey(user._id.toString())],
+      key: [this.authHelpers.getLoginUserKey(user._id.toString())],
     });
-    return updated;
+    return {
+      id: String(updated._id),
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+      email: updated.email,
+      phoneNumber: this.security.dedecrypting(updated.phoneNumber),
+      role: updated.role,
+      accountStatus: updated.accountStatus,
+      emailVerifiedAt: updated.emailVerifiedAt,
+    };
   }
 
   // ---------------------- CHANGE PASSWORD --------------------
@@ -146,11 +171,11 @@ class UserService {
       select: "+password",
     });
     if (!account) throw new exceptions.NotFoundException("User not found");
-    await security.compare({
+    await this.security.compare({
       plainText: currentPassword,
       cipherText: account.password,
     });
-    const password = await security.hash({ plainText: newPassword });
+    const password = await this.security.hash({ plainText: newPassword });
     const updated = await this.userRepo.findOneAndUpdate({
       filter: { _id: userId, password: account.password },
       update: { $set: { password, credentialsChangedAt: Date.now() } },
@@ -161,7 +186,10 @@ class UserService {
         "Password changed. Please try again.",
       );
     await cacheService.del({
-      key: [this.authHelpers.getUserKey(userId.toString()), this.authHelpers.getLoginUserKey(userId.toString())],
+      key: [
+        this.authHelpers.getUserKey(userId.toString()),
+        this.authHelpers.getLoginUserKey(userId.toString()),
+      ],
     });
   }
 }

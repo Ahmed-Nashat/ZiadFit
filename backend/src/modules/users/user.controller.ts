@@ -5,9 +5,12 @@ import {
   changePasswordSchema,
   clientListSchema,
 } from "./index.js";
-import { respopnseFormatter, validator } from "../../common/index.js";
-import { authenticate } from "../../common/middleware/auth.js";
-import { roleBasedAccessMiddleware } from "../../common/middleware/authorization.js";
+import {
+  respopnseFormatter,
+  validator,
+  authenticate,
+  roleBasedAccessMiddleware,
+} from "../../common/index.js";
 import { roleEnum } from "../../common/enums/role.enum.js";
 import { HUser } from "../../database/index.js";
 
