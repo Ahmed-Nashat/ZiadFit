@@ -3,6 +3,7 @@ import {
   userService,
   userUpdateSchema,
   changePasswordSchema,
+  clientListSchema,
 } from "./index.js";
 import { respopnseFormatter, validator } from "../../common/index.js";
 import { authenticate } from "../../common/middleware/auth.js";
@@ -12,23 +13,22 @@ import { HUser } from "../../database/index.js";
 
 export const userRouter = Router();
 
+// ---------------------- GET CLIENTS ------------------------
 userRouter.get(
   "/clients",
   authenticate,
   roleBasedAccessMiddleware([roleEnum.coach]),
+  validator(clientListSchema),
   respopnseFormatter(async (req: Request) => {
-    const { page, limit } = req.query;
     return {
       status: 200,
       msg: "Clients retrieved",
-      data: await userService.getClients(
-        page === undefined ? undefined : Number(page),
-        limit === undefined ? undefined : Number(limit),
-      ),
+      data: await userService.getClients(req.validate.query),
     };
   }),
 );
 
+// ---------------------- GET CLIENTS BY ID ------------------
 userRouter.get(
   "/clients/:clientId",
   authenticate,

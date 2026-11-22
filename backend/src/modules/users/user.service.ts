@@ -6,8 +6,10 @@ import { questionnaireStatusEnum } from "../../common/enums/questionnaireStatus.
 import { cacheService } from "../../common/services/cache.service.js";
 import { AuthHelpers, authHelpers } from "../auth/auth.helpers.js";
 import type { ICachedUser } from "../../common/interface/token.interface.js";
-import { isValidObjectId, Types } from "mongoose";
+import { isValidObjectId, Types, type QueryFilter } from "mongoose";
 import { roleEnum } from "../../common/enums/role.enum.js";
+import { accountStatusEnum } from "../../common/enums/accountStatus.enum.js";
+import { genderEnum } from "../../common/enums/gender.enum.js";
 
 interface IUpdateUser {
   user: HUser;
@@ -26,9 +28,38 @@ class UserService {
     this.authHelpers = authHelpers;
   }
 
-  async getClients(page?: number, limit?: number) {
+  // ---------------------- GET CLIENTS ------------------------
+  async getClients({
+    search,
+    accountStatus,
+    gender,
+    page,
+    limit,
+  }: {
+    search?: string;
+    accountStatus?: accountStatusEnum;
+    gender?: genderEnum;
+    page?: number;
+    limit?: number;
+  } = {}) {
+    const filter: QueryFilter<IUser> = { role: roleEnum.client };
+    if (accountStatus !== undefined) filter.accountStatus = accountStatus;
+    if (gender !== undefined) filter.gender = gender;
+    if (search) {
+      filter.$and = search.split(/\s+/).map((term) => {
+        const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const pattern = new RegExp(escaped, "i");
+        return {
+          $or: [
+            { firstName: pattern },
+            { lastName: pattern },
+            { email: pattern },
+          ],
+        };
+      });
+    }
     return this.userRepo.paggination({
-      filter: { role: roleEnum.client },
+      filter,
       page,
       limit,
       select: ["firstName", "lastName", "email", "accountStatus", "createdAt"],

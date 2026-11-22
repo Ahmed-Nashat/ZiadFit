@@ -25,6 +25,20 @@ A full-stack fitness coaching platform for managing personalized workout plans, 
 - **REST API:** Centralized business logic, authentication, and data management.
 - **Database:** Client profiles, subscriptions, workout programs, and performance history.
 
+## Coach client search
+
+`GET /user/clients` requires authentication and the coach role. Optional query
+parameters can be combined:
+
+- `search`: case-insensitive name or email search (1–100 characters). Each
+  space-separated word must match a name or email field.
+- `accountStatus`: `0` for active or `1` for suspended.
+- `gender`: `0` for male or `1` for female.
+- `page`: positive integer, up to 1,000,000 (default 1).
+- `limit`: positive integer, up to 100 (default 10).
+
+Example: `/user/clients?search=ahmad%20ali&accountStatus=0&page=1&limit=10`.
+
 ---
 
 **Coach Ziad — Train Hard. Track Everything.**

@@ -1,6 +1,17 @@
 import { z } from "zod";
 import { generalFields } from "../../common/index.js";
 
+export const clientListSchema = () =>
+  z.object({
+    query: z.strictObject({
+      search: z.string().trim().min(1).max(100).optional(),
+      accountStatus: z.enum(["0", "1"]).transform(Number).optional(),
+      gender: z.enum(["0", "1"]).transform(Number).optional(),
+      page: z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(z.number().int().max(1000000)).optional(),
+      limit: z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(z.number().int().max(100)).optional(),
+    }),
+  });
+
 export const userUpdateSchema = () =>
   z.object({
     body: z
