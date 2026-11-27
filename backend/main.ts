@@ -4,10 +4,10 @@ import express, {
   type Response,
 } from "express";
 import cors from "cors";
-import { dbConnection } from "./src/database/index.js";
-import * as routers from "./src/modules/index.js";
-import { errorHandler } from "./src/common/index.js";
-import { cacheService } from "./src/common/services/cache.service.js";
+import { dbConnection } from "./scripts/src/database/index.js";
+import * as routers from "./scripts/src/modules/index.js";
+import { errorHandler } from "./scripts/src/common/index.js";
+import { cacheService } from "./scripts/src/common/services/cache.service.js";
 
 const app = express();
 app.use(express.json(), cors());

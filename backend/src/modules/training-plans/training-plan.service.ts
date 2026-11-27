@@ -41,12 +41,27 @@ class TrainingPlanService {
         `${user.firstName} ${user.lastName}`.trim(),
       ]),
     );
-    const exerciseIds = plans.flatMap((plan) => plan.days.flatMap((day) => day.exercises.map((exercise) => exercise.exerciseId)));
-    const exercises = exerciseIds.length ? await exerciseRepo.findMany(
-      { _id: { $in: exerciseIds } },
-      { name: 1, muscleGroup: 1, equipment: 1, instructions: 1, videoUrl: 1, isArchived: 1 },
-    ) : [];
-    const exercisesById = new Map(exercises.map((exercise) => [String(exercise._id), exercise]));
+    const exerciseIds = plans.flatMap((plan) =>
+      plan.days.flatMap((day) =>
+        day.exercises.map((exercise) => exercise.exerciseId),
+      ),
+    );
+    const exercises = exerciseIds.length
+      ? await exerciseRepo.findMany(
+          { _id: { $in: exerciseIds } },
+          {
+            name: 1,
+            muscleGroup: 1,
+            equipment: 1,
+            instructions: 1,
+            videoUrl: 1,
+            isArchived: 1,
+          },
+        )
+      : [];
+    const exercisesById = new Map(
+      exercises.map((exercise) => [String(exercise._id), exercise]),
+    );
     return plans.map((plan) => {
       const { clientId, createdBy, ...details } = plan.toObject();
       return {
@@ -58,13 +73,15 @@ class TrainingPlanService {
             return {
               ...item,
               exerciseName: exercise?.name ?? null,
-              exerciseDetails: exercise ? {
-                muscleGroup: exercise.muscleGroup,
-                equipment: exercise.equipment,
-                instructions: exercise.instructions,
-                videoUrl: exercise.videoUrl,
-                isArchived: exercise.isArchived,
-              } : null,
+              exerciseDetails: exercise
+                ? {
+                    muscleGroup: exercise.muscleGroup,
+                    equipment: exercise.equipment,
+                    instructions: exercise.instructions,
+                    videoUrl: exercise.videoUrl,
+                    isArchived: exercise.isArchived,
+                  }
+                : null,
             };
           }),
         })),
@@ -87,20 +104,37 @@ class TrainingPlanService {
     const exerciseNames = [
       ...new Set(
         data.days.flatMap((day) =>
-          day.exercises.map((exercise) => exercise.exerciseName.trim().toLowerCase()),
+          day.exercises.map((exercise) =>
+            exercise.exerciseName.trim().toLowerCase(),
+          ),
         ),
       ),
     ];
     const exercises = await exerciseRepo.findMany(
       {
-        name: { $in: exerciseNames.map((name) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")) },
+        name: {
+          $in: exerciseNames.map(
+            (name) =>
+              new RegExp(
+                `^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+                "i",
+              ),
+          ),
+        },
         isArchived: { $ne: true },
       },
       { _id: 1, name: 1 },
     );
-    const exercisesByName = new Map(exercises.map((exercise) => [exercise.name.trim().toLowerCase(), exercise]));
+    const exercisesByName = new Map(
+      exercises.map((exercise) => [
+        exercise.name.trim().toLowerCase(),
+        exercise,
+      ]),
+    );
     if (exercises.length !== exercisesByName.size)
-      throw new ConflictException("More than one exercise has the same name; rename duplicates before assigning a plan");
+      throw new ConflictException(
+        "More than one exercise has the same name; rename duplicates before assigning a plan",
+      );
     if (exerciseNames.some((name) => !exercisesByName.has(name)))
       throw new BadRequestException(
         "One or more exercises do not exist or are archived",
