@@ -103,8 +103,31 @@ class UserService {
       select: ["clientId", "status", "answers", "submittedAt"],
       options: { sort: { submittedAt: 1, _id: 1 } },
     });
+    const clients = result.data.length
+      ? await this.userRepo.findMany({
+          filter: { _id: { $in: result.data.map((request) => request.clientId) } },
+          projection: { firstName: 1, lastName: 1, DOB: 1 },
+        })
+      : [];
+    const clientsById = new Map(clients.map((client) => [String(client._id), client]));
+    const today = new Date();
     return {
       ...result,
+      data: result.data.map((request) => {
+        const client = clientsById.get(String(request.clientId));
+        const birthDate = client?.DOB ? new Date(client.DOB) : null;
+        let age: number | null = null;
+        if (birthDate && !Number.isNaN(birthDate.getTime()) && birthDate <= today) {
+          age = today.getUTCFullYear() - birthDate.getUTCFullYear();
+          if (today.getUTCMonth() < birthDate.getUTCMonth() ||
+              (today.getUTCMonth() === birthDate.getUTCMonth() && today.getUTCDate() < birthDate.getUTCDate())) age--;
+        }
+        return {
+          ...request.toObject(),
+          clientName: client ? `${client.firstName} ${client.lastName}`.trim() : null,
+          clientAge: age,
+        };
+      }),
       meta: {
         ...result.meta,
         totalCount: result.meta.count,
