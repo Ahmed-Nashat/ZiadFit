@@ -25,6 +25,7 @@ app.use("/auth", routers.authRouter);
 app.use("/user", routers.userRouter);
 app.use("/subscription", routers.subscriptionRouter);
 app.use("/questionnaire", routers.questionnaireRouter);
+app.use("/exercises", routers.exerciseRouter);
 
 app.use(errorHandler);
 app.listen(3000, () => {
