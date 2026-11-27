@@ -108,7 +108,7 @@ class UserService {
           filter: {
             _id: { $in: result.data.map((request) => request.clientId) },
           },
-          projection: { firstName: 1, lastName: 1, DOB: 1 },
+          projection: { firstName: 1, lastName: 1, DOB: 1, phoneNumber: 1 },
         })
       : [];
     const clientsById = new Map(
@@ -140,6 +140,9 @@ class UserService {
             ? `${client.firstName} ${client.lastName}`.trim()
             : null,
           clientAge: age,
+          clientPhoneNumber: client?.phoneNumber
+            ? this.security.dedecrypting(client.phoneNumber)
+            : null,
         };
       }),
       meta: {
