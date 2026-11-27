@@ -5,6 +5,7 @@ export {
 export { default as BaseRepo } from "./base.repo.js";
 export { userRepo, type UserRepo } from "./user.repo.js";
 export { exerciseRepo, type ExerciseRepo } from "./exercise.repo.js";
+export { trainingPlanRepo, type TrainingPlanRepo } from "./training-plan.repo.js";
 export {
   questionnaireRepo,
   type QuestionnaireRepo,
