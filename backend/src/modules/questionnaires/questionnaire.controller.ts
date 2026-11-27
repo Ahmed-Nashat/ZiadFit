@@ -5,7 +5,7 @@ import { validator } from "../../common/middleware/vallidator.js";
 import { respopnseFormatter } from "../../common/middleware/response.formatter.js";
 import { roleEnum } from "../../common/enums/role.enum.js";
 import { questionnaireService } from "./questionnaire.service.js";
-import { questionnaireSubmissionSchema } from "./questionnaire.validation.js";
+import { questionnaireAcceptanceSchema, questionnaireDecisionSchema, questionnaireSubmissionSchema } from "./questionnaire.validation.js";
 
 export const questionnaireRouter = Router();
 
@@ -24,3 +24,35 @@ questionnaireRouter.post(
     }),
   })),
 );
+
+questionnaireRouter.patch(
+  "/:questionnaireId/review",
+  authenticate,
+  roleBasedAccessMiddleware([roleEnum.coach]),
+  validator(questionnaireDecisionSchema),
+  respopnseFormatter(async (req: Request) => ({
+    status: 200,
+    msg: "Questionnaire reviewed",
+    data: await questionnaireService.reviewQuestionnaire({
+      questionnaireId: req.validate.params.questionnaireId,
+      coachId: String(req.user!._id),
+      notes: req.validate.body.notes,
+    }),
+  })),
+);
+
+questionnaireRouter.patch(
+    "/:questionnaireId/accept",
+    authenticate,
+    roleBasedAccessMiddleware([roleEnum.coach]),
+    validator(questionnaireAcceptanceSchema),
+    respopnseFormatter(async (req: Request) => ({
+      status: 200,
+      msg: "Questionnaire accepted",
+      data: await questionnaireService.acceptQuestionnaire({
+        questionnaireId: req.validate.params.questionnaireId,
+        coachId: String(req.user!._id),
+        months: req.validate.body.months,
+      }),
+    })),
+  );

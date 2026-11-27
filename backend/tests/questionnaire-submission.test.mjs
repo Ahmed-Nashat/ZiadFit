@@ -24,9 +24,11 @@ test("submission validates assessment answers and rejects client-supplied identi
 test("only a verified client can submit and ownership comes from the authenticated ID", async () => {
   const find = userRepo.findOne;
   const create = questionnaireRepo.createSubmission;
+  const findQuestionnaire = questionnaireRepo.findOne;
   const clientId = "507f1f77bcf86cd799439011";
   let submitted = false;
   try {
+    questionnaireRepo.findOne = async () => null;
     questionnaireRepo.createSubmission = async ({ clientId: id }) => {
       submitted = true;
       assert.equal(String(id), clientId);
@@ -45,8 +47,14 @@ test("only a verified client can submit and ownership comes from the authenticat
     const result = await questionnaireService.submitQuestionnaire({ clientId, answers });
     assert.equal(result.status, "pending");
     assert.equal(submitted, true);
+    questionnaireRepo.findOne = async () => ({ status: "reviewed" });
+    await assert.rejects(questionnaireService.submitQuestionnaire({ clientId, answers }), { status: 409 });
+    questionnaireRepo.findOne = async () => null;
+    questionnaireRepo.createSubmission = async () => { throw {code:11000,keyPattern:{clientId:1}}; };
+    await assert.rejects(questionnaireService.submitQuestionnaire({ clientId, answers }), { status: 409 });
   } finally {
     userRepo.findOne = find;
     questionnaireRepo.createSubmission = create;
+    questionnaireRepo.findOne = findQuestionnaire;
   }
 });

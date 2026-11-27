@@ -7,6 +7,7 @@ export interface IQuestionnaire {
   status: questionnaireStatusEnum;
   submittedAt: Date;
   reviewedAt?: Date;
+  acceptedAt?: Date;
   reviewedBy?: Types.ObjectId;
   reviewNotes?: string;
   createdAt: Date;

@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import { Types, type ClientSession } from "mongoose";
 import { questionnaireModel } from "../../database/models/questionnaire.model.js";
 import { questionnaireStatusEnum } from "../enums/questionnaireStatus.enum.js";
 import type { IQuestionnaire, IQuestionnaireAnswers } from "../interface/questionnaire.interface.js";
@@ -62,28 +62,40 @@ export class QuestionnaireRepo extends BaseRepo<IQuestionnaire> {
   }
 
   async markReviewed({
-    clientId,
     viewerId,
     notes,
     questionnaireId,
   }: {
-    clientId: Types.ObjectId;
     questionnaireId: Types.ObjectId;
     viewerId: Types.ObjectId;
-    notes: string;
-  }): Promise<IQuestionnaire | null> {
+    notes?: string;
+  }) {
     return this.findOneAndUpdate({
       filter: {
         _id: questionnaireId,
-        clientId,
         status: questionnaireStatusEnum.pending,
       },
       update: {
         status: questionnaireStatusEnum.reviewed,
         reviewedAt: new Date(),
         reviewedBy: viewerId,
-        reviewNotes: notes,
+        ...(notes !== undefined ? { reviewNotes: notes } : {}),
       },
+    });
+  }
+
+  async acceptReviewed({ questionnaireId, acceptedAt, session }: {
+    questionnaireId: Types.ObjectId;
+    acceptedAt: Date;
+    session: ClientSession;
+  }) {
+    return this.findOneAndUpdate({
+      filter: { _id: questionnaireId, status: questionnaireStatusEnum.reviewed },
+      update: { $set: {
+        status: questionnaireStatusEnum.accepted,
+        acceptedAt,
+      } },
+      options: { runValidators: true, session },
     });
   }
 }

@@ -97,16 +97,16 @@ class UserService {
   // ---------------------- GET PENDING REQUESTS ---------------
   async getPendingRequests(page?: number, limit?: number) {
     const result = await this.questionnaireRepo.paggination({
-      filter: { status: enums.questionnaireStatusEnum.pending },
+      filter: { status: { $in: [enums.questionnaireStatusEnum.pending, enums.questionnaireStatusEnum.reviewed] } },
       page,
       limit,
-      select: ["clientId", "status", "answers", "submittedAt"],
+      select: ["clientId", "reviewedBy", "status", "answers", "submittedAt"],
       options: { sort: { submittedAt: 1, _id: 1 } },
     });
     const clients = result.data.length
       ? await this.userRepo.findMany({
           filter: {
-            _id: { $in: result.data.map((request) => request.clientId) },
+            _id: { $in: result.data.flatMap((request) => [request.clientId, ...(request.reviewedBy ? [request.reviewedBy] : [])]) },
           },
           projection: { firstName: 1, lastName: 1, DOB: 1, phoneNumber: 1 },
         })
@@ -119,6 +119,7 @@ class UserService {
       ...result,
       data: result.data.map((request) => {
         const client = clientsById.get(String(request.clientId));
+        const coach = request.reviewedBy ? clientsById.get(String(request.reviewedBy)) : undefined;
         const birthDate = client?.DOB ? new Date(client.DOB) : null;
         let age: number | null = null;
         if (
@@ -134,8 +135,9 @@ class UserService {
           )
             age--;
         }
+        const { clientId: _clientId, reviewedBy: _reviewedBy, ...questionnaire } = request.toObject();
         return {
-          ...request.toObject(),
+          ...questionnaire,
           clientName: client
             ? `${client.firstName} ${client.lastName}`.trim()
             : null,
@@ -143,6 +145,7 @@ class UserService {
           clientPhoneNumber: client?.phoneNumber
             ? this.security.dedecrypting(client.phoneNumber)
             : null,
+          coachName: coach ? `${coach.firstName} ${coach.lastName}`.trim() : null,
         };
       }),
       meta: {

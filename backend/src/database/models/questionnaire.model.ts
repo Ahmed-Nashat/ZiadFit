@@ -89,6 +89,7 @@ const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
     },
     submittedAt: { type: Date, required: true, default: Date.now },
     reviewedAt: Date,
+    acceptedAt: Date,
   },
   {
     strictQuery: true,
@@ -96,6 +97,8 @@ const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
     strict: true,
   },
 );
+
+questionnaireSchema.index({ clientId: 1 }, { unique: true, name: "unique_questionnaire_client" });
 
 export const questionnaireModel = mongoose.model<IQuestionnaire>(
   "questionnaire",

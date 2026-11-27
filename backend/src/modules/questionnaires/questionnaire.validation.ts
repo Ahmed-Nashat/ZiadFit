@@ -22,3 +22,20 @@ const answersSchema: z.ZodType<IQuestionnaireAnswers> = z.strictObject({
 
 export const questionnaireSubmissionSchema = () =>
   z.object({ body: z.strictObject({ answers: answersSchema }) });
+
+export const questionnaireAcceptanceSchema = () => z.object({
+  params: z.object({ questionnaireId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid questionnaire ID") }),
+  body: z.strictObject({ months: z.union([z.literal(1), z.literal(2), z.literal(3)]) }),
+});
+
+export const questionnaireDecisionSchema = () =>
+  z.object({
+    params: z.object({
+      questionnaireId: z
+        .string()
+        .regex(/^[a-f\d]{24}$/i, "Invalid questionnaire ID"),
+    }),
+    body: z
+      .strictObject({ notes: z.string().trim().min(1).max(2000).optional() })
+      .default({}),
+  });
