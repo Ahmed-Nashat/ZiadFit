@@ -8,9 +8,9 @@ import {
   type ICachedUser,
 } from "../../common/index.js";
 import { HUser } from "../../database/index.js";
-import { cacheService } from "../../common/services/cache.service.js";
 import { AuthHelpers, authHelpers } from "../auth/auth.helpers.js";
 import { isValidObjectId, Types, type QueryFilter } from "mongoose";
+import { cacheService } from "../../common/services/cache.service.js";
 
 interface IUpdateUser {
   user: HUser;

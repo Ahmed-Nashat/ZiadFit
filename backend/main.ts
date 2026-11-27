@@ -24,6 +24,7 @@ app.get("/", (req: Request, res: Response, next: NextFunction): Response => {
 app.use("/auth", routers.authRouter);
 app.use("/user", routers.userRouter);
 app.use("/subscription", routers.subscriptionRouter);
+app.use("/questionnaire", routers.questionnaireRouter);
 
 app.use(errorHandler);
 app.listen(3000, () => {

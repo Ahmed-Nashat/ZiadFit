@@ -16,8 +16,14 @@ export interface IQuestionnaire {
 
 export interface IQuestionnaireAnswers {
   primaryGoal: string;
+  secondaryGoal?: string;
   heightCm: number;
   weightKg: number;
+  bodyFatPercentage?: number;
+  energyLevel: number;
+  stress: string;
+  smoking: string;
+  medicalHistory: string;
   trainingExp: string;
   trainingDaysPerWeek: number;
   sessionDurationMinutes: number;

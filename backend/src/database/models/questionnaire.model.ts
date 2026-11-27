@@ -33,6 +33,7 @@ const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
         required: true,
         trim: true,
       },
+      secondaryGoal: { type: String, trim: true },
       heightCm: {
         type: Number,
         required: true,
@@ -43,6 +44,11 @@ const questionnaireSchema = new mongoose.Schema<IQuestionnaire>(
         required: true,
         min: 0,
       },
+      bodyFatPercentage: { type: Number, min: 0, max: 100 },
+      energyLevel: { type: Number, required: true, min: 1, max: 10 },
+      stress: { type: String, required: true, trim: true },
+      smoking: { type: String, required: true, trim: true },
+      medicalHistory: { type: String, required: true, trim: true },
       trainingDaysPerWeek: {
         type: Number,
         required: true,

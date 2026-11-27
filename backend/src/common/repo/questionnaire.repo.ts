@@ -57,7 +57,7 @@ export class QuestionnaireRepo extends BaseRepo<IQuestionnaire> {
   }: {
     clientId: Types.ObjectId;
     answers: IQuestionnaireAnswers;
-  }): Promise<IQuestionnaire> {
+  }) {
     return this.create({ data: { clientId, answers } });
   }
 
