@@ -1,4 +1,4 @@
-# Coach Zyaead — Fitness Coaching Platform
+# Coach Ziad — Fitness Coaching Platform
 
 A full-stack fitness coaching platform for managing personalized workout plans, tracking client progress, and streamlining online coaching.
 
