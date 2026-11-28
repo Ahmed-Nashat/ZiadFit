@@ -24,7 +24,10 @@ trainingPlanRouter.delete(
   respopnseFormatter(async (req: Request) => ({
     status: 200,
     msg: "Training day deleted",
-    data: await trainingPlanService.deleteDay(req.validate.params.clientId, req.validate.params.dayName),
+    data: await trainingPlanService.deleteDay(
+      req.validate.params.clientId,
+      req.validate.params.dayName,
+    ),
   })),
 );
 

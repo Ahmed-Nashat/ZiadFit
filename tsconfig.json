@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["backend/main.ts", "backend/scripts/src/**/*.ts"]
+  "include": ["backend/main.ts", "backend/src/**/*.ts"]
 }
