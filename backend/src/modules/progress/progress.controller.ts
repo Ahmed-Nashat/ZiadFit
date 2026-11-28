@@ -5,9 +5,17 @@ import { validator } from "../../common/middleware/vallidator.js";
 import { respopnseFormatter } from "../../common/middleware/response.formatter.js";
 import { roleEnum } from "../../common/enums/role.enum.js";
 import { progressService } from "./progress.service.js";
+import { coachDashboardService } from "./coach-dashboard.service.js";
+import { coachDashboardSchema, coachDashboardClientsSchema } from "./coach-dashboard.validation.js";
 import { submitCheckInSchema, checkInListSchema, coachCheckInListSchema, coachProgressSummarySchema, exerciseProgressSchema, coachExerciseProgressSchema } from "./progress.validation.js";
 
 export const progressRouter = Router();
+
+progressRouter.get("/coach/dashboard", authenticate, roleBasedAccessMiddleware([roleEnum.coach]), validator(coachDashboardSchema),
+  respopnseFormatter(async (req: Request) => ({ status: 200, msg: "Coach dashboard retrieved", data: await coachDashboardService.getOverview(req.validate.query) })));
+
+progressRouter.get("/coach/clients", authenticate, roleBasedAccessMiddleware([roleEnum.coach]), validator(coachDashboardClientsSchema),
+  respopnseFormatter(async (req: Request) => ({ status: 200, msg: "Client progress retrieved", data: await coachDashboardService.getClients(req.validate.query, req.validate.query.page, req.validate.query.limit) })));
 
 progressRouter.post("/check-ins", authenticate, roleBasedAccessMiddleware([roleEnum.client]), validator(submitCheckInSchema),
   respopnseFormatter(async (req: Request) => ({ status: 201, msg: "Check-in saved", data: await progressService.submitCheckIn(String(req.user!._id), req.validate.body) })));
