@@ -27,6 +27,7 @@ app.use("/subscription", routers.subscriptionRouter);
 app.use("/questionnaire", routers.questionnaireRouter);
 app.use("/exercises", routers.exerciseRouter);
 app.use("/training-plans", routers.trainingPlanRouter);
+app.use("/workouts", routers.workoutRouter);
 
 app.use(errorHandler);
 app.listen(3000, () => {

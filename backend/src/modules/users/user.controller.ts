@@ -25,7 +25,11 @@ userRouter.get(
   respopnseFormatter(async (req: Request) => ({
     status: 200,
     msg: "Clients retrieved",
-    data: await userService.searchClientsByName(req.validate.query.name, req.validate.query.page, req.validate.query.limit),
+    data: await userService.searchClientsByName(
+      req.validate.query.name,
+      req.validate.query.page,
+      req.validate.query.limit,
+    ),
   })),
 );
 

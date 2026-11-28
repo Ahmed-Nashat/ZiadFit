@@ -4,3 +4,4 @@ export {subscriptionRouter} from "./subscriptions/index.js";
 export { questionnaireRouter } from "./questionnaires/index.js";
 export { exerciseRouter } from "./exercises/index.js";
 export { trainingPlanRouter } from "./training-plans/index.js";
+export { workoutRouter } from "./workouts/index.js";
