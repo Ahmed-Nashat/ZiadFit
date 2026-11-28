@@ -6,6 +6,7 @@ import { questionnaireAcceptanceSchema, questionnaireDecisionSchema } from "../d
 import { questionnaireRepo } from "../dist/src/common/repo/questionnaire.repo.js";
 import { subscriptionRepo } from "../dist/src/common/repo/subscription.repo.js";
 import { userRepo } from "../dist/src/common/repo/user.repo.js";
+import { clientNotifications } from "../dist/src/common/services/client-notifications.service.js";
 import { encrypting } from "../dist/src/common/security/encrypting.js";
 import { roleBasedAccessMiddleware } from "../dist/src/common/middleware/authorization.js";
 import { roleEnum } from "../dist/src/common/enums/role.enum.js";
@@ -13,6 +14,8 @@ import { roleEnum } from "../dist/src/common/enums/role.enum.js";
 const questionnaireId = "507f1f77bcf86cd799439011";
 const coachId = "507f1f77bcf86cd799439012";
 const clientId = new mongoose.Types.ObjectId("507f1f77bcf86cd799439013");
+clientNotifications.reviewed = async () => {};
+clientNotifications.accepted = async () => {};
 
 test("review and acceptance inputs are validated", () => {
   assert.equal(questionnaireDecisionSchema().safeParse({params:{questionnaireId}, body:{}}).success, true);
@@ -34,7 +37,10 @@ test("only coaches can access coach actions", () => {
 test("review moves only a pending request to reviewed", async () => {
   const original = questionnaireRepo.findOneAndUpdate;
   const originalUsers = userRepo.findMany;
+  const notify = clientNotifications.reviewed;
+  let notified = false;
   try {
+    clientNotifications.reviewed = async id => { assert.equal(String(id),String(clientId)); notified=true; };
     questionnaireRepo.findOneAndUpdate = async args => {
       assert.equal(args.filter.status, 'pending');
       assert.equal(args.update.status, 'reviewed');
@@ -53,7 +59,8 @@ test("review moves only a pending request to reviewed", async () => {
     assert.equal(result.coachName, 'Ziad Coach');
     assert.equal('clientId' in result, false);
     assert.equal('reviewedBy' in result, false);
-  } finally { questionnaireRepo.findOneAndUpdate = original; userRepo.findMany = originalUsers; }
+    assert.equal(notified, true);
+  } finally { questionnaireRepo.findOneAndUpdate = original; userRepo.findMany = originalUsers; clientNotifications.reviewed=notify; }
 });
 
 test("acceptance starts subscription at the acceptance time within the same session", async () => {
@@ -63,10 +70,13 @@ test("acceptance starts subscription at the acceptance time within the same sess
   const updateSubscription = subscriptionRepo.findOneAndUpdate;
   const findSubscription = subscriptionRepo.findOne;
   const findUsers = userRepo.findMany;
+  const notify = clientNotifications.accepted;
+  let transactionCommitted = false;
   let closed = false, acceptedAt;
-  const session = {withTransaction: async fn => fn(), endSession: async () => {closed=true;}};
+  const session = {withTransaction: async fn => {const result=await fn();transactionCommitted=true;return result;}, endSession: async () => {closed=true;}};
   try {
     mongoose.startSession = async () => session;
+    clientNotifications.accepted = async (id,start,end) => {assert.equal(transactionCommitted,true);assert.equal(String(id),String(clientId));assert.equal(start,acceptedAt);assert.ok(end>start);};
     userRepo.findMany = async () => [
       {_id:clientId, firstName:'Ahmed', lastName:'Ali', phoneNumber:encrypting('+201012345678')},
       {_id:new mongoose.Types.ObjectId(coachId), firstName:'Ziad', lastName:'Coach'},
@@ -109,6 +119,7 @@ test("acceptance starts subscription at the acceptance time within the same sess
     subscriptionRepo.findOneAndUpdate=updateSubscription;
     subscriptionRepo.findOne=findSubscription;
     userRepo.findMany=findUsers;
+    clientNotifications.accepted=notify;
   }
 });
 

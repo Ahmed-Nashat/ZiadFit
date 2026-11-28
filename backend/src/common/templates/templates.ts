@@ -1,6 +1,12 @@
 type OtpTemplateData = { name: string; otp: number | string };
 type SubscriptionEmailData = { name: string; endDate: string };
 
+export const questionnaireReviewedTemplate = ({ name }: { name: string }): string =>
+  emailLayout("Questionnaire reviewed", `<tr><td style="background:#172131;padding:32px 28px;"><p style="color:#6ebcff;font-size:11px;letter-spacing:2px;">YOUR QUESTIONNAIRE</p><h1 style="color:#fff;font-size:30px;margin:0;">Your answers have been reviewed.</h1></td></tr><tr><td style="padding:30px 28px;">${paragraph(`Hi ${name}, Coach Ziad has reviewed your answers and will contact you about the next step.`)}${paragraph("We will let you know once your questionnaire is accepted.")}</td></tr>`);
+
+export const questionnaireAcceptedTemplate = ({ name, startDate, endDate }: { name: string; startDate: string; endDate: string }): string =>
+  emailLayout("Subscription active", `<tr><td style="background:#e8ff2f;padding:32px 28px;color:#080b12;"><p style="font-size:11px;letter-spacing:2px;font-weight:bold;">QUESTIONNAIRE ACCEPTED</p><h1 style="font-size:34px;margin:0;">LET'S GET STARTED.</h1></td></tr><tr><td style="padding:30px 28px;">${paragraph(`Hi ${name}, your questionnaire has been accepted and your subscription is active.`)}<table role="presentation" width="100%" cellpadding="10" style="background:#172131;color:#fff;"><tr><td>STARTS</td><td>${escapeHtml(startDate)}</td></tr><tr><td>ENDS</td><td>${escapeHtml(endDate)}</td></tr></table></td></tr>`);
+
 const escapeHtml = (value: string | number): string =>
   String(value).replace(
     /[&<>"']/g,

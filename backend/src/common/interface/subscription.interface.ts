@@ -5,4 +5,7 @@ export interface ISubscription {
   startAt: Date;
   endAt: Date;
   activatedBy: Types.ObjectId;
+  reminderSentFor?: Date;
+  reminderClaimId?: string;
+  reminderClaimUntil?: Date;
 }

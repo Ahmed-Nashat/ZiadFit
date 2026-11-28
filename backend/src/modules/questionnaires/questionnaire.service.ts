@@ -17,6 +17,7 @@ import type {
 import { subscriptionRepo } from "../../common/repo/subscription.repo.js";
 import { dedecrypting } from "../../common/security/encrypting.js";
 import { questionnaireStatusEnum } from "../../common/enums/questionnaireStatus.enum.js";
+import { clientNotifications } from "../../common/services/client-notifications.service.js";
 import {
   calculateSubscriptionEnd,
   type SubscriptionDuration,
@@ -148,7 +149,13 @@ class QuestionnaireService {
         "Questionnaire has already been reviewed",
       );
     }
-    return this.formatQuestionnaire(result);
+    const response = await this.formatQuestionnaire(result);
+    try {
+      await clientNotifications.reviewed(result.clientId);
+    } catch {
+      console.error("Could not send questionnaire review email");
+    }
+    return response;
   }
 
   async acceptQuestionnaire({
@@ -167,7 +174,7 @@ class QuestionnaireService {
     const id = new Types.ObjectId(questionnaireId);
     const session = await mongoose.startSession();
     try {
-      return await session.withTransaction(async () => {
+      const result = await session.withTransaction(async () => {
         const existing = await this.questionnaireRepo.findOne({
           filter: { _id: id },
           options: { session },
@@ -213,6 +220,7 @@ class QuestionnaireService {
           });
         return {
           questionnaire: await this.formatQuestionnaire(questionnaire, session),
+          clientId: questionnaire.clientId,
           subscription: {
             status: "active",
             startAt: activeSubscription?.startAt ?? startAt,
@@ -220,6 +228,13 @@ class QuestionnaireService {
           },
         };
       });
+      try {
+        await clientNotifications.accepted(result.clientId, result.subscription.startAt, result.subscription.endAt);
+      } catch {
+        console.error("Could not send questionnaire acceptance email");
+      }
+      const { clientId: _clientId, ...response } = result;
+      return response;
     } catch (error: unknown) {
       if (
         typeof error === "object" &&

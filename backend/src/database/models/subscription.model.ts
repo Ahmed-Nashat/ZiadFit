@@ -11,6 +11,9 @@ const subscriptionSchema = new mongoose.Schema<ISubscription>(
     },
     startAt: { type: Date, required: true },
     endAt: { type: Date, required: true },
+    reminderSentFor: Date,
+    reminderClaimId: String,
+    reminderClaimUntil: Date,
     activatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "user",
@@ -19,6 +22,8 @@ const subscriptionSchema = new mongoose.Schema<ISubscription>(
   },
   { timestamps: true },
 );
+
+subscriptionSchema.index({ endAt: 1 });
 
 export const subscriptionModel = mongoose.model<ISubscription>(
   "subscription",

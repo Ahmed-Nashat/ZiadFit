@@ -101,7 +101,10 @@ class WorkoutService {
       limit,
       options: { sort: { finishedAt: -1, _id: -1 } },
     });
-    return { ...result, data: result.data.map((workout) => this.formatWorkout(workout)) };
+    return {
+      ...result,
+      data: result.data.map((workout) => this.formatWorkout(workout)),
+    };
   }
 
   async getPreviousPerformance(clientId: string, exerciseName: string) {
@@ -111,18 +114,29 @@ class WorkoutService {
       filter: {
         clientId: new Types.ObjectId(clientId),
         status: "completed",
-        exercises: { $elemMatch: { exerciseName: namePattern, "sets.0": { $exists: true } } },
+        exercises: {
+          $elemMatch: {
+            exerciseName: namePattern,
+            "sets.0": { $exists: true },
+          },
+        },
       },
       options: { sort: { finishedAt: -1, _id: -1 } },
     });
-    const exercise = workout?.exercises.find((item) => namePattern.test(item.exerciseName) && item.sets.length > 0);
+    const exercise = workout?.exercises.find(
+      (item) => namePattern.test(item.exerciseName) && item.sets.length > 0,
+    );
     if (!workout || !exercise) return { exerciseName, previous: null };
     return {
       exerciseName: exercise.exerciseName,
       previous: {
         dayName: workout.dayName,
         finishedAt: workout.finishedAt,
-        sets: exercise.sets.map(({ setNumber, reps, weightKg }) => ({ setNumber, reps, ...(weightKg !== undefined ? { weightKg } : {}) })),
+        sets: exercise.sets.map(({ setNumber, reps, weightKg }) => ({
+          setNumber,
+          reps,
+          ...(weightKg !== undefined ? { weightKg } : {}),
+        })),
       },
     };
   }
@@ -134,7 +148,10 @@ class WorkoutService {
     });
     if (!client) throw new NotFoundException("Client not found");
     const history = await this.getWorkoutHistory(clientId, page, limit);
-    return { clientName: `${client.firstName} ${client.lastName}`.trim(), ...history };
+    return {
+      clientName: `${client.firstName} ${client.lastName}`.trim(),
+      ...history,
+    };
   }
 
   async finishWorkout(clientId: string, workoutId: string) {

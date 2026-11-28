@@ -8,12 +8,14 @@ import { dbConnection } from "./src/database/index.js";
 import * as routers from "./src/modules/index.js";
 import { errorHandler } from "./src/common/index.js";
 import { cacheService } from "./src/common/services/cache.service.js";
+import { startSubscriptionReminderScheduler } from "./src/modules/subscriptions/subscription-reminders.js";
 
 const app = express();
 app.use(express.json(), cors());
 
 await dbConnection();
 await cacheService.connect();
+startSubscriptionReminderScheduler();
 
 app.get("/", (req: Request, res: Response, next: NextFunction): Response => {
   return res.status(200).json({
