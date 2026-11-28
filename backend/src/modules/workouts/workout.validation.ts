@@ -7,6 +7,10 @@ export const workoutHistorySchema = () => z.object({
   }),
 });
 
+export const coachWorkoutHistorySchema = () => workoutHistorySchema().extend({
+  params: z.object({ clientId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid client ID") }),
+});
+
 export const startWorkoutSchema = () => z.object({
   body: z.strictObject({ dayName: z.string().trim().min(1).max(80) }),
 });

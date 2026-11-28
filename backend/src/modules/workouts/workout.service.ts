@@ -7,6 +7,8 @@ import {
 import { trainingPlanRepo } from "../../common/repo/training-plan.repo.js";
 import { exerciseRepo } from "../../common/repo/exercise.repo.js";
 import { workoutRepo } from "../../common/repo/workout.repo.js";
+import { userRepo } from "../../common/repo/user.repo.js";
+import { roleEnum } from "../../common/enums/role.enum.js";
 import type { IWorkout } from "../../common/interface/workout.interface.js";
 import type { ITrainingPlan } from "../../common/interface/training-plan.interface.js";
 
@@ -100,6 +102,16 @@ class WorkoutService {
       options: { sort: { finishedAt: -1, _id: -1 } },
     });
     return { ...result, data: result.data.map((workout) => this.formatWorkout(workout)) };
+  }
+
+  async getClientWorkoutHistory(clientId: string, page: number, limit: number) {
+    const client = await userRepo.findOne({
+      filter: { _id: new Types.ObjectId(clientId), role: roleEnum.client },
+      projection: { firstName: 1, lastName: 1 },
+    });
+    if (!client) throw new NotFoundException("Client not found");
+    const history = await this.getWorkoutHistory(clientId, page, limit);
+    return { clientName: `${client.firstName} ${client.lastName}`.trim(), ...history };
   }
 
   async finishWorkout(clientId: string, workoutId: string) {
