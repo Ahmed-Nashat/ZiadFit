@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export const workoutHistorySchema = () => z.object({
+  query: z.object({
+    page: z.coerce.number().int().min(1).max(1000000).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+  }),
+});
+
 export const startWorkoutSchema = () => z.object({
   body: z.strictObject({ dayName: z.string().trim().min(1).max(80) }),
 });

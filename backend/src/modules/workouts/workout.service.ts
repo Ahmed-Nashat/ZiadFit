@@ -92,11 +92,27 @@ class WorkoutService {
     return this.formatWorkout(workout as HydratedDocument<IWorkout>);
   }
 
+  async getWorkoutHistory(clientId: string, page: number, limit: number) {
+    const result = await workoutRepo.paggination({
+      filter: { clientId: new Types.ObjectId(clientId), status: "completed" },
+      page,
+      limit,
+      options: { sort: { finishedAt: -1, _id: -1 } },
+    });
+    return { ...result, data: result.data.map((workout) => this.formatWorkout(workout)) };
+  }
+
   async finishWorkout(clientId: string, workoutId: string) {
-    const filter = { _id: new Types.ObjectId(workoutId), clientId: new Types.ObjectId(clientId) };
+    const filter = {
+      _id: new Types.ObjectId(workoutId),
+      clientId: new Types.ObjectId(clientId),
+    };
     const workout = await workoutRepo.findOneAndUpdate({
       filter: { ...filter, status: "inProgress" },
-      update: { $set: { status: "completed", finishedAt: new Date() }, $inc: { __v: 1 } },
+      update: {
+        $set: { status: "completed", finishedAt: new Date() },
+        $inc: { __v: 1 },
+      },
       options: { runValidators: true },
     });
     if (!workout) {

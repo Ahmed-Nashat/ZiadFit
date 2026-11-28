@@ -5,9 +5,16 @@ import { validator } from "../../common/middleware/vallidator.js";
 import { respopnseFormatter } from "../../common/middleware/response.formatter.js";
 import { roleEnum } from "../../common/enums/role.enum.js";
 import { workoutService } from "./workout.service.js";
-import { finishWorkoutSchema, logWorkoutSetSchema, startWorkoutSchema } from "./workout.validation.js";
+import { finishWorkoutSchema, logWorkoutSetSchema, startWorkoutSchema, workoutHistorySchema } from "./workout.validation.js";
 
 export const workoutRouter = Router();
+
+workoutRouter.get("/history", authenticate, roleBasedAccessMiddleware([roleEnum.client]), validator(workoutHistorySchema),
+  respopnseFormatter(async (req: Request) => ({
+    status: 200,
+    msg: "Workout history retrieved",
+    data: await workoutService.getWorkoutHistory(String(req.user!._id), req.validate.query.page, req.validate.query.limit),
+  })));
 
 workoutRouter.patch("/:workoutId/finish", authenticate, roleBasedAccessMiddleware([roleEnum.client]), validator(finishWorkoutSchema),
   respopnseFormatter(async (req: Request) => ({
