@@ -13,8 +13,21 @@ import {
 } from "../../common/index.js";
 import { roleEnum } from "../../common/enums/role.enum.js";
 import { HUser } from "../../database/index.js";
+import { clientNameSearchSchema } from "./user.validation.js";
 
 export const userRouter = Router();
+
+userRouter.get(
+  "/clients/search",
+  authenticate,
+  roleBasedAccessMiddleware([roleEnum.coach]),
+  validator(clientNameSearchSchema),
+  respopnseFormatter(async (req: Request) => ({
+    status: 200,
+    msg: "Clients retrieved",
+    data: await userService.searchClientsByName(req.validate.query.name, req.validate.query.page, req.validate.query.limit),
+  })),
+);
 
 // ---------------------- GET CLIENTS ------------------------
 userRouter.get(

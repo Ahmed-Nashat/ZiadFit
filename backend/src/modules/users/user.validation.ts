@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { generalFields } from "../../common/index.js";
 
+export const clientNameSearchSchema = () => z.object({
+  query: z.object({
+    name: z.string().trim().min(1).max(100),
+    page: z.coerce.number().int().min(1).max(1000000).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+  }),
+});
+
 export const clientListSchema = () =>
   z.object({
     query: z.strictObject({

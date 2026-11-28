@@ -33,6 +33,21 @@ class UserService {
   }
 
   // ---------------------- GET CLIENTS ------------------------
+  async searchClientsByName(name: string, page: number, limit: number) {
+    const terms = name.trim().split(/\s+/).map((term) => {
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pattern = new RegExp(escaped, "i");
+      return { $or: [{ firstName: pattern }, { lastName: pattern }] };
+    });
+    return this.userRepo.paggination({
+      filter: { role: enums.roleEnum.client, $and: terms },
+      page,
+      limit,
+      select: ["firstName", "lastName", "email", "accountStatus", "createdAt"],
+      options: { sort: { createdAt: -1, _id: -1 } },
+    });
+  }
+
   async getClients({
     search,
     accountStatus,
