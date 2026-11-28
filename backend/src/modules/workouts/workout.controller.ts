@@ -5,9 +5,16 @@ import { validator } from "../../common/middleware/vallidator.js";
 import { respopnseFormatter } from "../../common/middleware/response.formatter.js";
 import { roleEnum } from "../../common/enums/role.enum.js";
 import { workoutService } from "./workout.service.js";
-import { logWorkoutSetSchema, startWorkoutSchema } from "./workout.validation.js";
+import { finishWorkoutSchema, logWorkoutSetSchema, startWorkoutSchema } from "./workout.validation.js";
 
 export const workoutRouter = Router();
+
+workoutRouter.patch("/:workoutId/finish", authenticate, roleBasedAccessMiddleware([roleEnum.client]), validator(finishWorkoutSchema),
+  respopnseFormatter(async (req: Request) => ({
+    status: 200,
+    msg: "Workout completed",
+    data: await workoutService.finishWorkout(String(req.user!._id), req.validate.params.workoutId),
+  })));
 
 workoutRouter.put("/active/sets", authenticate, roleBasedAccessMiddleware([roleEnum.client]), validator(logWorkoutSetSchema),
   respopnseFormatter(async (req: Request) => ({

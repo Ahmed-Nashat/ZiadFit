@@ -92,6 +92,21 @@ class WorkoutService {
     return this.formatWorkout(workout as HydratedDocument<IWorkout>);
   }
 
+  async finishWorkout(clientId: string, workoutId: string) {
+    const filter = { _id: new Types.ObjectId(workoutId), clientId: new Types.ObjectId(clientId) };
+    const workout = await workoutRepo.findOneAndUpdate({
+      filter: { ...filter, status: "inProgress" },
+      update: { $set: { status: "completed", finishedAt: new Date() }, $inc: { __v: 1 } },
+      options: { runValidators: true },
+    });
+    if (!workout) {
+      const existing = await workoutRepo.findOne({ filter });
+      if (!existing) throw new NotFoundException("Workout not found");
+      throw new ConflictException("Workout has already been completed");
+    }
+    return this.formatWorkout(workout);
+  }
+
   async logSet(
     clientId: string,
     data: {

@@ -4,6 +4,10 @@ export const startWorkoutSchema = () => z.object({
   body: z.strictObject({ dayName: z.string().trim().min(1).max(80) }),
 });
 
+export const finishWorkoutSchema = () => z.object({
+  params: z.object({ workoutId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid workout ID") }),
+});
+
 export const logWorkoutSetSchema = () => z.object({
   body: z.strictObject({
     exerciseName: z.string().trim().min(1).max(120),
