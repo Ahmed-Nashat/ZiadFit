@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const previousPerformanceSchema = () => z.object({
+  query: z.object({ exerciseName: z.string().trim().min(1).max(120) }),
+});
+
 export const workoutHistorySchema = () => z.object({
   query: z.object({
     page: z.coerce.number().int().min(1).max(1000000).default(1),
