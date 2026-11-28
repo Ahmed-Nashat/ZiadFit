@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import type { IWorkout } from "../../common/interface/workout.interface.js";
 
 const loggedSetSchema = new mongoose.Schema({
+  setNumber: { type: Number, required: true, min: 1, max: 100 },
   reps: { type: Number, required: true, min: 1 },
   weightKg: { type: Number, min: 0 },
 }, { _id: false });

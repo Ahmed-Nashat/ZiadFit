@@ -13,7 +13,7 @@ export interface IWorkout {
     targetSets: number;
     targetReps: number;
     notes?: string;
-    sets: { reps: number; weightKg?: number }[];
+    sets: { setNumber: number; reps: number; weightKg?: number }[];
   }[];
   createdAt: Date;
   updatedAt: Date;

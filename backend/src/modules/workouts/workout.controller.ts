@@ -5,9 +5,16 @@ import { validator } from "../../common/middleware/vallidator.js";
 import { respopnseFormatter } from "../../common/middleware/response.formatter.js";
 import { roleEnum } from "../../common/enums/role.enum.js";
 import { workoutService } from "./workout.service.js";
-import { startWorkoutSchema } from "./workout.validation.js";
+import { logWorkoutSetSchema, startWorkoutSchema } from "./workout.validation.js";
 
 export const workoutRouter = Router();
+
+workoutRouter.put("/active/sets", authenticate, roleBasedAccessMiddleware([roleEnum.client]), validator(logWorkoutSetSchema),
+  respopnseFormatter(async (req: Request) => ({
+    status: 200,
+    msg: "Workout set saved",
+    data: await workoutService.logSet(String(req.user!._id), req.validate.body),
+  })));
 
 workoutRouter.post("/start", authenticate, roleBasedAccessMiddleware([roleEnum.client]), validator(startWorkoutSchema),
   respopnseFormatter(async (req: Request) => ({

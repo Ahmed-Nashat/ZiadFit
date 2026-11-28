@@ -91,6 +91,61 @@ class WorkoutService {
     if (!workout) throw new NotFoundException("No in-progress workout found");
     return this.formatWorkout(workout as HydratedDocument<IWorkout>);
   }
+
+  async logSet(
+    clientId: string,
+    data: {
+      exerciseName: string;
+      setNumber: number;
+      reps: number;
+      weightKg?: number;
+    },
+  ) {
+    const clientObjectId = new Types.ObjectId(clientId);
+    const workout = (await workoutRepo.findOne({
+      filter: { clientId: clientObjectId, status: "inProgress" },
+    })) as HydratedDocument<IWorkout> | null;
+    if (!workout) throw new NotFoundException("No in-progress workout found");
+    const exercises = workout.toObject().exercises;
+    const matches = exercises.filter(
+      (exercise) =>
+        exercise.exerciseName.trim().toLowerCase() ===
+        data.exerciseName.trim().toLowerCase(),
+    );
+    if (!matches.length)
+      throw new NotFoundException("Exercise not found in this workout");
+    if (matches.length > 1)
+      throw new ConflictException(
+        "More than one exercise has this name in the workout",
+      );
+    const exercise = matches[0]!;
+    const loggedSet = {
+      setNumber: data.setNumber,
+      reps: data.reps,
+      ...(data.weightKg !== undefined ? { weightKg: data.weightKg } : {}),
+    };
+    const index = exercise.sets.findIndex(
+      (item) => item.setNumber === data.setNumber,
+    );
+    if (index < 0) exercise.sets.push(loggedSet);
+    else exercise.sets[index] = loggedSet;
+    exercise.sets.sort((a, b) => a.setNumber - b.setNumber);
+    const updated = await workoutRepo.findOneAndUpdate({
+      filter: {
+        _id: workout._id,
+        clientId: clientObjectId,
+        status: "inProgress",
+        __v: workout.__v ?? { $exists: false },
+      },
+      update: { $set: { exercises }, $inc: { __v: 1 } },
+      options: { runValidators: true },
+    });
+    if (!updated)
+      throw new ConflictException(
+        "Workout changed while saving. Please try again",
+      );
+    return this.formatWorkout(updated);
+  }
 }
 
 export const workoutService = new WorkoutService();
